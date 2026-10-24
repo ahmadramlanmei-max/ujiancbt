@@ -224,45 +224,50 @@
             #view-admin .text-4xl { font-size: 24px !important; }
         }
 
-        /* Login: pusatkan berdasarkan lebar viewport, bukan lebar konten body.
-           Ini menghindari pergeseran pada Android/tablet dan mode desktop browser. */
+        /* Login: gunakan lapisan selebar viewport lalu pusatkan kartu di dalamnya.
+           Cara ini lebih stabil pada Android, termasuk saat browser memakai mode desktop. */
+        html, body {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
         #view-login {
             box-sizing: border-box !important;
             position: fixed !important;
-            left: 50vw !important;
-            top: 50% !important;
-            right: auto !important;
-            width: min(28rem, calc(100vw - 2rem)) !important;
-            max-width: calc(100vw - 2rem) !important;
+            inset: 0 !important;
+            width: 100% !important;
+            max-width: none !important;
             margin: 0 !important;
-            padding-left: 0 !important;
-            padding-right: 0 !important;
-            transform: translate(-50%, -50%) !important;
+            padding: 1rem !important;
+            transform: none !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
             z-index: 10 !important;
-            max-height: calc(100dvh - 1.5rem) !important;
+            max-height: 100dvh !important;
             overflow-y: auto !important;
+            overflow-x: hidden !important;
             overscroll-behavior: contain;
         }
         #view-login > .glass-panel {
             box-sizing: border-box !important;
-            width: 100% !important;
+            width: min(30rem, 100%) !important;
             min-width: 0 !important;
-            margin: 0 auto !important;
+            max-width: 100% !important;
+            margin: auto !important;
+            flex: 0 1 30rem !important;
         }
         #view-login .glass-panel {
-            padding: clamp(1.1rem, 5vw, 2rem) !important;
+            padding: clamp(1.25rem, 4vw, 2.25rem) !important;
         }
         @media (max-height: 600px) {
             #view-login {
-                top: 50% !important;
-                max-height: calc(100dvh - 1rem) !important;
+                align-items: flex-start !important;
+                padding-top: .75rem !important;
+                padding-bottom: .75rem !important;
             }
-            #view-login .glass-panel {
-                padding: 1rem !important;
-            }
-            #view-login .text-center.mb-8 {
-                margin-bottom: 1rem !important;
-            }
+            #view-login > .glass-panel { margin-top: auto !important; margin-bottom: auto !important; }
+            #view-login .glass-panel { padding: 1rem !important; }
+            #view-login .text-center.mb-8 { margin-bottom: 1rem !important; }
         }
     </style>
 </head>
