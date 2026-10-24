@@ -231,6 +231,9 @@
             max-width: 100% !important;
         }
         #view-login:not(.hidden) {
+            display: flex !important;
+            visibility: visible !important;
+            pointer-events: auto !important;
             box-sizing: border-box !important;
             position: fixed !important;
             inset: 0 !important;
@@ -268,6 +271,14 @@
             #view-login > .glass-panel { margin-top: auto !important; margin-bottom: auto !important; }
             #view-login .glass-panel { padding: 1rem !important; }
             #view-login .text-center.mb-8 { margin-bottom: 1rem !important; }
+        }
+
+        /* Penting: aturan pemusatan #view-login tidak boleh mengalahkan kelas hidden.
+           Setelah login sukses, halaman login wajib benar-benar tidak dirender. */
+        #view-login.hidden {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
         }
     </style>
 </head>
