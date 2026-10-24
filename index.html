@@ -1579,13 +1579,16 @@
                     });
                     if ([...kelasEl.options].some(o => o.value === kelasSebelum)) kelasEl.value = kelasSebelum;
                     if ([...mapelEl.options].some(o => o.value === mapelSebelum)) mapelEl.value = mapelSebelum;
-                    muatHasilUjianAdmin();
+                    cacheHasilUjianAdmin = [];
+                    document.getElementById("hasil-ujian-info").textContent = "Pilih kelas dan mata pelajaran, lalu klik Tampilkan Hasil.";
+                    document.getElementById("tabel-hasil-ujian-admin").innerHTML =
+                        '<tr><td colspan="10" class="p-8 text-center text-slate-500">Pilih filter kelas dan mata pelajaran, lalu klik Tampilkan Hasil.</td></tr>';
                 })
                 .withFailureHandler(function(err) {
                     hideLoading();
                     showAlert("Koneksi Gagal", err && err.message ? err.message : "Gagal memuat filter hasil ujian.");
                 })
-                .getHasilUjianAdmin("Semua Kelas", "Semua Mapel");
+                .getHasilUjianAdmin("", "", false);
         }
 
         function muatHasilUjianAdmin() {
@@ -1625,7 +1628,7 @@
                     hideLoading();
                     showAlert("Koneksi Gagal", err && err.message ? err.message : "Gagal mengambil hasil ujian.");
                 })
-                .getHasilUjianAdmin(kelas, mapel);
+                .getHasilUjianAdmin(kelas, mapel, true);
         }
 
         function downloadHasilUjianExcel() {
