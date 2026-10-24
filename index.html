@@ -230,7 +230,7 @@
             width: 100% !important;
             max-width: 100% !important;
         }
-        #view-login {
+        #view-login:not(.hidden) {
             box-sizing: border-box !important;
             position: fixed !important;
             inset: 0 !important;
@@ -239,7 +239,7 @@
             margin: 0 !important;
             padding: 1rem !important;
             transform: none !important;
-            display: flex !important;
+            display: flex;
             align-items: center !important;
             justify-content: center !important;
             z-index: 10 !important;
@@ -260,7 +260,7 @@
             padding: clamp(1.25rem, 4vw, 2.25rem) !important;
         }
         @media (max-height: 600px) {
-            #view-login {
+            #view-login:not(.hidden) {
                 align-items: flex-start !important;
                 padding-top: .75rem !important;
                 padding-bottom: .75rem !important;
