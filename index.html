@@ -224,43 +224,44 @@
             #view-admin .text-4xl { font-size: 24px !important; }
         }
 
-        /* Login: pusatkan kartu secara presisi pada layar kecil, termasuk Android. */
+        /* Login: pusatkan berdasarkan lebar viewport, bukan lebar konten body.
+           Ini menghindari pergeseran pada Android/tablet dan mode desktop browser. */
         #view-login {
             box-sizing: border-box !important;
-            width: 100% !important;
-            max-width: 28rem !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
-            left: auto !important;
+            position: fixed !important;
+            left: 50vw !important;
+            top: 50% !important;
             right: auto !important;
-            transform: none !important;
+            width: min(28rem, calc(100vw - 2rem)) !important;
+            max-width: calc(100vw - 2rem) !important;
+            margin: 0 !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            transform: translate(-50%, -50%) !important;
+            z-index: 10 !important;
+            max-height: calc(100dvh - 1.5rem) !important;
+            overflow-y: auto !important;
+            overscroll-behavior: contain;
         }
         #view-login > .glass-panel {
             box-sizing: border-box !important;
             width: 100% !important;
             min-width: 0 !important;
-            margin-left: auto !important;
-            margin-right: auto !important;
+            margin: 0 auto !important;
         }
-        @media (max-width: 767px) {
-            body:has(#view-login:not(.hidden)) {
-                justify-content: center !important;
-                align-items: center !important;
-                padding-left: 0 !important;
-                padding-right: 0 !important;
-            }
+        #view-login .glass-panel {
+            padding: clamp(1.1rem, 5vw, 2rem) !important;
+        }
+        @media (max-height: 600px) {
             #view-login {
-                flex: 0 1 28rem !important;
-                padding-left: 1rem !important;
-                padding-right: 1rem !important;
-            }
-            #view-login.flex {
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
+                top: 50% !important;
+                max-height: calc(100dvh - 1rem) !important;
             }
             #view-login .glass-panel {
-                padding: clamp(1.1rem, 5vw, 2rem) !important;
+                padding: 1rem !important;
+            }
+            #view-login .text-center.mb-8 {
+                margin-bottom: 1rem !important;
             }
         }
     </style>
