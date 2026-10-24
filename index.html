@@ -383,6 +383,7 @@
                 <button onclick="switchTabAdmin('guru')" id="tab-admin-guru" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-slate-300 hover:bg-slate-700 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">♧</span><span>Manajemen Guru</span></button>
                 <button onclick="switchTabAdmin('kelengkapan')" id="tab-admin-kelengkapan" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-slate-300 hover:bg-slate-700 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">▤</span><span>Kelengkapan Ujian</span></button>
                 <button onclick="switchTabAdmin('ringkasan')" id="tab-admin-ringkasan" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-slate-300 hover:bg-slate-700 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">☷</span><span>Ringkasan Soal</span></button>
+                <button onclick="switchTabAdmin('hasilUjian')" id="tab-admin-hasilUjian" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-slate-300 hover:bg-slate-700 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">⇩</span><span>Download Hasil Ujian</span></button>
                 </div>
                 <div class="mt-3 pt-3 border-t border-slate-700">
                     <button onclick="logoutAplikasi()" class="w-full text-left flex items-center py-2.5 px-4 rounded transition hover:bg-slate-700 text-red-400 border border-red-500/30"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">⇥</span><span>Keluar Sistem</span></button>
@@ -813,6 +814,57 @@
                             </thead>
                             <tbody id="tabel-ringkasan-soal-admin" class="text-sm divide-y divide-slate-100">
                                 <tr><td colspan="5" class="p-8 text-center text-slate-500">Silakan pilih filter Mapel dan Kelas di atas, lalu klik Refresh Data untuk menampilkan soal.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="panel-admin-hasilUjian" class="hidden space-y-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800">Download Hasil Ujian</h1>
+                    <p class="text-slate-500 mt-1">Unduh nilai yang tersimpan di database spreadsheet dalam format Excel (.xlsx).</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="filter-hasil-kelas" class="block text-sm font-medium text-slate-700 mb-1">Filter Kelas</label>
+                            <select id="filter-hasil-kelas" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="Semua Kelas">Semua Kelas</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="filter-hasil-mapel" class="block text-sm font-medium text-slate-700 mb-1">Filter Mata Pelajaran</label>
+                            <select id="filter-hasil-mapel" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                                <option value="Semua Mapel">Semua Mapel</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3 mt-5">
+                        <button onclick="muatHasilUjianAdmin()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition">Tampilkan Hasil</button>
+                        <button onclick="downloadHasilUjianExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-semibold transition">Download Excel (.xlsx)</button>
+                    </div>
+                    <p id="hasil-ujian-info" class="text-sm text-slate-500 mt-4">Pilih kelas dan mata pelajaran, lalu tampilkan hasil.</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 text-sm border-b border-slate-200">
+                                    <th class="p-3 font-semibold">No.</th>
+                                    <th class="p-3 font-semibold">Waktu</th>
+                                    <th class="p-3 font-semibold">NISN</th>
+                                    <th class="p-3 font-semibold">Nama</th>
+                                    <th class="p-3 font-semibold">Kelas</th>
+                                    <th class="p-3 font-semibold">Sesi</th>
+                                    <th class="p-3 font-semibold">Mata Pelajaran</th>
+                                    <th class="p-3 font-semibold">Benar</th>
+                                    <th class="p-3 font-semibold">Salah</th>
+                                    <th class="p-3 font-semibold">Skor Akhir</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabel-hasil-ujian-admin" class="text-sm divide-y divide-slate-100">
+                                <tr><td colspan="10" class="p-8 text-center text-slate-500">Hasil ujian akan tampil di sini.</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1414,6 +1466,7 @@
             const tabGuru = document.getElementById('tab-admin-guru');
             const tabRingkasan = document.getElementById('tab-admin-ringkasan');
             const tabKelengkapan = document.getElementById('tab-admin-kelengkapan');
+            const tabHasilUjian = document.getElementById('tab-admin-hasilUjian');
             
             const panelDashboard = document.getElementById('panel-admin-dashboard');
             const panelStatusTes = document.getElementById('panel-admin-statusTes');
@@ -1423,6 +1476,7 @@
             const panelGuru = document.getElementById('panel-admin-guru');
             const panelRingkasan = document.getElementById('panel-admin-ringkasan');
             const panelKelengkapan = document.getElementById('panel-admin-kelengkapan');
+            const panelHasilUjian = document.getElementById('panel-admin-hasilUjian');
             
             const judul = document.getElementById('judul-halaman-admin');
 
@@ -1437,6 +1491,7 @@
             tabGuru.className = inactiveClass;
             tabRingkasan.className = inactiveClass;
             if(tabKelengkapan) tabKelengkapan.className = inactiveClass;
+            if(tabHasilUjian) tabHasilUjian.className = inactiveClass;
             
             panelDashboard.classList.add('hidden');
             if(panelStatusTes) panelStatusTes.classList.add('hidden');
@@ -1446,6 +1501,7 @@
             panelGuru.classList.add('hidden');
             panelRingkasan.classList.add('hidden');
             if(panelKelengkapan) panelKelengkapan.classList.add('hidden');
+            if(panelHasilUjian) panelHasilUjian.classList.add('hidden');
 
             if (tabId === 'dashboard') {
                 tabDashboard.className = activeClass;
@@ -1487,7 +1543,125 @@
                 panelKelengkapan.classList.remove('hidden');
                 judul.textContent = "Kelengkapan Administrasi Ujian";
                 loadKelengkapanAdmin();
+            } else if (tabId === 'hasilUjian') {
+                tabHasilUjian.className = activeClass;
+                panelHasilUjian.classList.remove('hidden');
+                judul.textContent = "Download Hasil Ujian";
+                siapkanFilterHasilUjianAdmin();
             }
+        }
+
+
+        let cacheHasilUjianAdmin = [];
+
+        function siapkanFilterHasilUjianAdmin() {
+            showLoading("Memuat filter hasil ujian...");
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    hideLoading();
+                    if (!res || !res.status) {
+                        showAlert("Gagal", "Daftar filter hasil ujian tidak dapat dimuat.");
+                        return;
+                    }
+                    const kelasEl = document.getElementById("filter-hasil-kelas");
+                    const mapelEl = document.getElementById("filter-hasil-mapel");
+                    const kelasSebelum = kelasEl.value || "Semua Kelas";
+                    const mapelSebelum = mapelEl.value || "Semua Mapel";
+                    kelasEl.innerHTML = '<option value="Semua Kelas">Semua Kelas</option>';
+                    mapelEl.innerHTML = '<option value="Semua Mapel">Semua Mapel</option>';
+                    (res.kelas || []).forEach(function(k) {
+                        const opt = document.createElement("option");
+                        opt.value = k; opt.textContent = k; kelasEl.appendChild(opt);
+                    });
+                    (res.mapel || []).forEach(function(m) {
+                        const opt = document.createElement("option");
+                        opt.value = m; opt.textContent = m; mapelEl.appendChild(opt);
+                    });
+                    if ([...kelasEl.options].some(o => o.value === kelasSebelum)) kelasEl.value = kelasSebelum;
+                    if ([...mapelEl.options].some(o => o.value === mapelSebelum)) mapelEl.value = mapelSebelum;
+                    muatHasilUjianAdmin();
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    showAlert("Koneksi Gagal", err && err.message ? err.message : "Gagal memuat filter hasil ujian.");
+                })
+                .getHasilUjianAdmin("Semua Kelas", "Semua Mapel");
+        }
+
+        function muatHasilUjianAdmin() {
+            const kelas = document.getElementById("filter-hasil-kelas").value || "Semua Kelas";
+            const mapel = document.getElementById("filter-hasil-mapel").value || "Semua Mapel";
+            showLoading("Mengambil hasil ujian dari spreadsheet...");
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    hideLoading();
+                    if (!res || !res.status) {
+                        showAlert("Gagal", "Data hasil ujian tidak dapat dimuat.");
+                        return;
+                    }
+                    cacheHasilUjianAdmin = res.hasil || [];
+                    const tbody = document.getElementById("tabel-hasil-ujian-admin");
+                    const info = document.getElementById("hasil-ujian-info");
+                    tbody.innerHTML = "";
+                    info.textContent = "Ditemukan " + cacheHasilUjianAdmin.length + " hasil ujian sesuai filter.";
+                    if (!cacheHasilUjianAdmin.length) {
+                        tbody.innerHTML = '<tr><td colspan="10" class="p-8 text-center text-slate-500">Belum ada hasil ujian untuk filter ini.</td></tr>';
+                        return;
+                    }
+                    cacheHasilUjianAdmin.forEach(function(item, index) {
+                        const tr = document.createElement("tr");
+                        tr.className = "hover:bg-slate-50";
+                        [index + 1, item.waktu, item.nisn, item.nama, item.kelas, item.sesi, item.mapel, item.benar, item.salah, item.skor]
+                            .forEach(function(value) {
+                                const td = document.createElement("td");
+                                td.className = "p-3 whitespace-nowrap";
+                                td.textContent = value == null ? "" : String(value);
+                                tr.appendChild(td);
+                            });
+                        tbody.appendChild(tr);
+                    });
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    showAlert("Koneksi Gagal", err && err.message ? err.message : "Gagal mengambil hasil ujian.");
+                })
+                .getHasilUjianAdmin(kelas, mapel);
+        }
+
+        function downloadHasilUjianExcel() {
+            if (!window.XLSX) {
+                showAlert("Komponen Excel Tidak Tersedia", "Pustaka Excel belum berhasil dimuat. Periksa koneksi internet, lalu coba lagi.");
+                return;
+            }
+            if (!cacheHasilUjianAdmin.length) {
+                showAlert("Tidak Ada Data", "Tidak ada hasil ujian untuk diunduh. Tampilkan data terlebih dahulu atau ubah filter kelas dan mata pelajaran.");
+                return;
+            }
+            const rows = cacheHasilUjianAdmin.map(function(item, index) {
+                return {
+                    "No.": index + 1,
+                    "Waktu": item.waktu,
+                    "NISN": item.nisn,
+                    "Nama": item.nama,
+                    "Kelas": item.kelas,
+                    "Sesi": item.sesi,
+                    "Mata Pelajaran": item.mapel,
+                    "Benar": item.benar,
+                    "Salah": item.salah,
+                    "Skor Akhir": item.skor
+                };
+            });
+            const worksheet = XLSX.utils.json_to_sheet(rows);
+            worksheet["!cols"] = [
+                {wch:6},{wch:21},{wch:18},{wch:28},{wch:12},
+                {wch:12},{wch:28},{wch:10},{wch:10},{wch:12}
+            ];
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Hasil Ujian");
+            const kelas = document.getElementById("filter-hasil-kelas").value || "Semua-Kelas";
+            const mapel = document.getElementById("filter-hasil-mapel").value || "Semua-Mapel";
+            const safe = function(s) { return String(s).replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "_"); };
+            XLSX.writeFile(workbook, "Hasil_Ujian_" + safe(kelas) + "_" + safe(mapel) + ".xlsx");
         }
 
         function loadStatusTesAdmin() {
