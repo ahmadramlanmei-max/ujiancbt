@@ -625,7 +625,7 @@
             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
             
             <div class="text-center mb-8">
-                <div class="w-20 h-24 mx-auto flex items-center justify-center mb-4 shrink-0">
+                <div class="w-14 h-16 mx-auto flex items-center justify-center mb-4 shrink-0">
                     <img
                         src="https://commons.wikimedia.org/wiki/Special:FilePath/Lambang_Kabupaten_Katingan.png?width=160"
                         alt="Lambang Kabupaten Katingan"
@@ -705,6 +705,7 @@
                 <button onclick="switchTabAdmin('kelengkapan')" id="tab-admin-kelengkapan" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-slate-300 hover:bg-slate-700 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">▤</span><span>Kelengkapan Ujian</span></button>
                 <button onclick="switchTabAdmin('ringkasan')" id="tab-admin-ringkasan" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-slate-300 hover:bg-slate-700 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">☷</span><span>Ringkasan Soal</span></button>
                 <button onclick="switchTabAdmin('hasilUjian')" id="tab-admin-hasilUjian" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-slate-300 hover:bg-slate-700 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">⇩</span><span>Download Hasil Ujian</span></button>
+                <button onclick="switchTabAdmin('analisisSoal')" id="tab-admin-analisisSoal" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-slate-300 hover:bg-slate-700 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">▥</span><span>Analisis Butir Soal</span></button>
                 </div>
                 <div class="mt-3 pt-3 border-t border-slate-700">
                     <button onclick="logoutAplikasi()" class="w-full text-left flex items-center py-2.5 px-4 rounded transition hover:bg-slate-700 text-red-400 border border-red-500/30"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">⇥</span><span>Keluar Sistem</span></button>
@@ -1191,6 +1192,45 @@
                         </table>
                     </div>
                 </div>
+            </div>
+
+            <div id="panel-admin-analisisSoal" class="hidden space-y-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800">Analisis Butir Soal</h1>
+                    <p class="text-slate-500 mt-1">Lihat jumlah dan persentase jawaban benar/salah untuk setiap soal, berdasarkan kelas dan mata pelajaran.</p>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="filter-analisis-kelas" class="block text-sm font-medium text-slate-700 mb-1">Kelas</label>
+                            <select id="filter-analisis-kelas" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"><option value="Semua Kelas">Semua Kelas</option></select>
+                        </div>
+                        <div>
+                            <label for="filter-analisis-mapel" class="block text-sm font-medium text-slate-700 mb-1">Mata Pelajaran</label>
+                            <select id="filter-analisis-mapel" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"><option value="Semua Mapel">Semua Mapel</option></select>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3 mt-5">
+                        <button onclick="muatAnalisisButirSoalAdmin()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold transition">Tampilkan Analisis</button>
+                        <button onclick="downloadAnalisisButirSoalExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-semibold transition">Unduh Analisis Excel</button>
+                    </div>
+                    <p id="analisis-soal-info" class="text-sm text-slate-500 mt-4">Pilih kelas dan mata pelajaran untuk melihat analisis.</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white rounded-xl border border-slate-200 p-4"><p class="text-sm text-slate-500">Butir soal dianalisis</p><p id="analisis-total-butir" class="text-2xl font-bold text-slate-800 mt-1">0</p></div>
+                    <div class="bg-white rounded-xl border border-emerald-200 p-4"><p class="text-sm text-slate-500">Jawaban benar</p><p id="analisis-total-benar" class="text-2xl font-bold text-emerald-700 mt-1">0</p></div>
+                    <div class="bg-white rounded-xl border border-rose-200 p-4"><p class="text-sm text-slate-500">Jawaban salah</p><p id="analisis-total-salah" class="text-2xl font-bold text-rose-700 mt-1">0</p></div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-200"><h2 class="font-bold text-slate-800">Rincian Per Butir Soal</h2><p class="text-sm text-slate-500 mt-1">Diurutkan dari soal dengan persentase jawaban salah tertinggi.</p></div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[900px]">
+                            <thead><tr class="bg-slate-100 text-slate-600 text-sm border-b border-slate-200"><th class="p-3 font-semibold">No.</th><th class="p-3 font-semibold">Kelas</th><th class="p-3 font-semibold">Mata Pelajaran</th><th class="p-3 font-semibold">Soal</th><th class="p-3 font-semibold">Tipe</th><th class="p-3 font-semibold">Benar</th><th class="p-3 font-semibold">Salah</th><th class="p-3 font-semibold">% Benar</th><th class="p-3 font-semibold">% Salah</th></tr></thead>
+                            <tbody id="tabel-analisis-butir-soal" class="text-sm divide-y divide-slate-100"><tr><td colspan="9" class="p-8 text-center text-slate-500">Analisis akan tampil di sini.</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500">Catatan: analisis per soal mulai terkumpul setelah fitur ini dipasang. Hasil ujian lama yang hanya menyimpan nilai total tidak dapat dipecah kembali menjadi benar/salah per butir.</p>
             </div>
         </div>
     </div>
@@ -1813,6 +1853,7 @@
             const tabRingkasan = document.getElementById('tab-admin-ringkasan');
             const tabKelengkapan = document.getElementById('tab-admin-kelengkapan');
             const tabHasilUjian = document.getElementById('tab-admin-hasilUjian');
+            const tabAnalisisSoal = document.getElementById('tab-admin-analisisSoal');
             
             const panelDashboard = document.getElementById('panel-admin-dashboard');
             const panelStatusTes = document.getElementById('panel-admin-statusTes');
@@ -1823,6 +1864,7 @@
             const panelRingkasan = document.getElementById('panel-admin-ringkasan');
             const panelKelengkapan = document.getElementById('panel-admin-kelengkapan');
             const panelHasilUjian = document.getElementById('panel-admin-hasilUjian');
+            const panelAnalisisSoal = document.getElementById('panel-admin-analisisSoal');
             
             const judul = document.getElementById('judul-halaman-admin');
 
@@ -1838,6 +1880,7 @@
             tabRingkasan.className = inactiveClass;
             if(tabKelengkapan) tabKelengkapan.className = inactiveClass;
             if(tabHasilUjian) tabHasilUjian.className = inactiveClass;
+            if(tabAnalisisSoal) tabAnalisisSoal.className = inactiveClass;
             
             panelDashboard.classList.add('hidden');
             if(panelStatusTes) panelStatusTes.classList.add('hidden');
@@ -1848,6 +1891,7 @@
             panelRingkasan.classList.add('hidden');
             if(panelKelengkapan) panelKelengkapan.classList.add('hidden');
             if(panelHasilUjian) panelHasilUjian.classList.add('hidden');
+            if(panelAnalisisSoal) panelAnalisisSoal.classList.add('hidden');
 
             if (tabId === 'dashboard') {
                 tabDashboard.className = activeClass;
@@ -1894,6 +1938,11 @@
                 panelHasilUjian.classList.remove('hidden');
                 judul.textContent = "Download Hasil Ujian";
                 siapkanFilterHasilUjianAdmin();
+            } else if (tabId === 'analisisSoal') {
+                tabAnalisisSoal.className = activeClass;
+                panelAnalisisSoal.classList.remove('hidden');
+                judul.textContent = "Analisis Butir Soal";
+                siapkanFilterAnalisisButirSoalAdmin();
             }
         }
 
@@ -1975,6 +2024,79 @@
                     showAlert("Koneksi Gagal", err && err.message ? err.message : "Gagal mengambil hasil ujian.");
                 })
                 .getHasilUjianAdmin(kelas, mapel, true);
+        }
+
+        let cacheAnalisisButirSoalAdmin = [];
+
+        function siapkanFilterAnalisisButirSoalAdmin() {
+            showLoading("Memuat data analisis butir soal...");
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    hideLoading();
+                    if (!res || !res.status) {
+                        showAlert("Gagal", "Data analisis butir soal tidak dapat dimuat.");
+                        return;
+                    }
+                    const kelasEl = document.getElementById("filter-analisis-kelas");
+                    const mapelEl = document.getElementById("filter-analisis-mapel");
+                    const kelasSebelum = kelasEl.value || "Semua Kelas";
+                    const mapelSebelum = mapelEl.value || "Semua Mapel";
+                    kelasEl.innerHTML = '<option value="Semua Kelas">Semua Kelas</option>';
+                    mapelEl.innerHTML = '<option value="Semua Mapel">Semua Mapel</option>';
+                    (res.kelas || []).forEach(function(v) { const o=document.createElement("option"); o.value=v; o.textContent=v; kelasEl.appendChild(o); });
+                    (res.mapel || []).forEach(function(v) { const o=document.createElement("option"); o.value=v; o.textContent=v; mapelEl.appendChild(o); });
+                    if ([...kelasEl.options].some(o => o.value === kelasSebelum)) kelasEl.value = kelasSebelum;
+                    if ([...mapelEl.options].some(o => o.value === mapelSebelum)) mapelEl.value = mapelSebelum;
+                    renderAnalisisButirSoalAdmin(res);
+                })
+                .withFailureHandler(function(err) { hideLoading(); showAlert("Koneksi Gagal", err && err.message ? err.message : "Gagal memuat analisis butir soal."); })
+                .getAnalisisButirSoalAdmin("Semua Kelas", "Semua Mapel");
+        }
+
+        function muatAnalisisButirSoalAdmin() {
+            const kelas = document.getElementById("filter-analisis-kelas").value || "Semua Kelas";
+            const mapel = document.getElementById("filter-analisis-mapel").value || "Semua Mapel";
+            showLoading("Menghitung analisis jawaban siswa...");
+            google.script.run
+                .withSuccessHandler(function(res) { hideLoading(); if (!res || !res.status) { showAlert("Gagal", "Analisis tidak dapat dimuat."); return; } renderAnalisisButirSoalAdmin(res); })
+                .withFailureHandler(function(err) { hideLoading(); showAlert("Koneksi Gagal", err && err.message ? err.message : "Gagal mengambil analisis butir soal."); })
+                .getAnalisisButirSoalAdmin(kelas, mapel);
+        }
+
+        function renderAnalisisButirSoalAdmin(res) {
+            cacheAnalisisButirSoalAdmin = res.analisis || [];
+            const tbody = document.getElementById("tabel-analisis-butir-soal");
+            tbody.innerHTML = "";
+            const totalBenar = cacheAnalisisButirSoalAdmin.reduce((sum,x) => sum + Number(x.benar || 0), 0);
+            const totalSalah = cacheAnalisisButirSoalAdmin.reduce((sum,x) => sum + Number(x.salah || 0), 0);
+            document.getElementById("analisis-total-butir").textContent = cacheAnalisisButirSoalAdmin.length;
+            document.getElementById("analisis-total-benar").textContent = totalBenar;
+            document.getElementById("analisis-total-salah").textContent = totalSalah;
+            const info = document.getElementById("analisis-soal-info");
+            info.textContent = cacheAnalisisButirSoalAdmin.length
+                ? "Dianalisis " + cacheAnalisisButirSoalAdmin.length + " butir soal dari data jawaban siswa yang tersedia."
+                : "Belum ada data analisis per butir untuk filter ini. Data akan mulai tercatat setelah siswa mengumpulkan ujian menggunakan versi backend yang diperbarui.";
+            if (!cacheAnalisisButirSoalAdmin.length) {
+                tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-500">Belum ada data analisis untuk pilihan kelas dan mata pelajaran ini.</td></tr>';
+                return;
+            }
+            cacheAnalisisButirSoalAdmin.forEach(function(item,index) {
+                const tr=document.createElement("tr");
+                tr.className = Number(item.persenSalah) >= 50 ? "bg-rose-50 hover:bg-rose-100" : "hover:bg-slate-50";
+                const cells=[index+1,item.kelas,item.mapel,"Soal "+item.idSoal+": "+item.pertanyaan,item.tipe,item.benar,item.salah,(item.persenBenar||0)+"%",(item.persenSalah||0)+"%"];
+                cells.forEach(function(value,i) { const td=document.createElement("td"); td.className="p-3 "+(i===3?"min-w-[280px] whitespace-normal":"whitespace-nowrap"); td.textContent=value==null?"":String(value); if(i===6 && Number(item.salah)>0) td.className+=" text-rose-700 font-semibold"; tr.appendChild(td); });
+                tbody.appendChild(tr);
+            });
+        }
+
+        function downloadAnalisisButirSoalExcel() {
+            if (!window.XLSX) { showAlert("Komponen Excel Tidak Tersedia", "Pustaka Excel belum berhasil dimuat. Periksa koneksi internet, lalu coba lagi."); return; }
+            if (!cacheAnalisisButirSoalAdmin.length) { showAlert("Tidak Ada Data", "Tampilkan analisis yang berisi data terlebih dahulu."); return; }
+            const rows=cacheAnalisisButirSoalAdmin.map(function(x,i){ return {"No.":i+1,"Kelas":x.kelas,"Mata Pelajaran":x.mapel,"ID Soal":x.idSoal,"Pertanyaan":x.pertanyaan,"Tipe":x.tipe,"Jumlah Benar":x.benar,"Jumlah Salah":x.salah,"Persen Benar":(x.persenBenar||0)+"%","Persen Salah":(x.persenSalah||0)+"%"}; });
+            const ws=XLSX.utils.json_to_sheet(rows); ws["!cols"]=[{wch:6},{wch:12},{wch:26},{wch:12},{wch:60},{wch:12},{wch:14},{wch:14},{wch:14},{wch:14}];
+            const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Analisis Butir Soal");
+            const safe=function(s){return String(s).replace(/[\\/:*?"<>|]+/g,"-").replace(/\s+/g,"_");};
+            XLSX.writeFile(wb,"Analisis_Butir_Soal_"+safe(document.getElementById("filter-analisis-kelas").value)+"_"+safe(document.getElementById("filter-analisis-mapel").value)+".xlsx");
         }
 
         function downloadHasilUjianExcel() {
