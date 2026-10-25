@@ -171,7 +171,7 @@
                 margin-top: 5px !important;
                 padding-top: 5px !important;
             }
-            #view-admin > div:nth-child(2) {
+            #view-admin > #admin-main-content {
                 flex: 1 1 auto !important;
                 width: 100% !important;
                 min-height: 0 !important;
@@ -180,7 +180,7 @@
                 overflow-y: auto !important;
                 -webkit-overflow-scrolling: touch;
             }
-            #view-admin > div:nth-child(2) > h1,
+            #view-admin > #admin-main-content > h1,
             #view-admin #panel-admin-kelengkapan > div:first-child h1,
             #view-admin #panel-admin-ringkasan > div:first-child h1 {
                 font-size: 20px !important;
@@ -219,7 +219,7 @@
         @media (max-width: 380px) {
             #view-admin > div:first-child { max-height: 43dvh; }
             #view-admin > div:first-child nav > div:first-child { max-height: 24dvh; }
-            #view-admin > div:nth-child(2) { padding: 9px !important; }
+            #view-admin > #admin-main-content { padding: 9px !important; }
             #view-admin > div:first-child nav button { padding: 6px !important; font-size: 10px !important; }
             #view-admin .text-4xl { font-size: 24px !important; }
         }
@@ -271,6 +271,153 @@
             #view-login > .glass-panel { margin-top: auto !important; margin-bottom: auto !important; }
             #view-login .glass-panel { padding: 1rem !important; }
             #view-login .text-center.mb-8 { margin-bottom: 1rem !important; }
+        }
+
+        /* Menu Admin berbentuk sidebar geser pada layar HP; desktop tetap seperti semula. */
+        #admin-mobile-toolbar,
+        #admin-mobile-backdrop { display: none; }
+
+        @media (max-width: 767px) {
+            #view-admin > #admin-sidebar-mobile {
+                position: fixed !important;
+                inset: 0 auto 0 0 !important;
+                width: min(84vw, 300px) !important;
+                max-width: 300px !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+                max-height: none !important;
+                overflow: hidden !important;
+                display: flex !important;
+                flex-direction: column !important;
+                transform: translateX(-105%);
+                transition: transform 220ms ease;
+                z-index: 61 !important;
+                box-shadow: 12px 0 30px rgba(15, 23, 42, .22);
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+            }
+
+            #view-admin.admin-sidebar-open > #admin-sidebar-mobile {
+                transform: translateX(0);
+            }
+
+            #view-admin > #admin-sidebar-mobile > nav {
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+                overflow: hidden !important;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+
+            #view-admin > #admin-sidebar-mobile > nav > div:first-child {
+                display: flex !important;
+                flex-direction: column !important;
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior: contain;
+            }
+
+            #view-admin > #admin-sidebar-mobile > nav > div:last-child {
+                flex: 0 0 auto !important;
+                background: #1e293b;
+            }
+
+            #admin-mobile-backdrop {
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, .48);
+                z-index: 60;
+                display: none;
+                touch-action: manipulation;
+            }
+
+            #view-admin.admin-sidebar-open > #admin-mobile-backdrop {
+                display: block;
+            }
+
+            #admin-mobile-toolbar {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin: -2px 0 16px;
+                position: sticky;
+                top: 0;
+                z-index: 20;
+                padding: 6px 0 10px;
+                background: #f1f5f9;
+            }
+
+            #admin-mobile-menu-button {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                border: 0;
+                border-radius: 10px;
+                background: #2563eb;
+                color: white;
+                padding: 10px 14px;
+                font-size: 15px;
+                font-weight: 600;
+                box-shadow: 0 2px 6px rgba(37, 99, 235, .2);
+                touch-action: manipulation;
+            }
+
+            #admin-mobile-title {
+                color: #334155;
+                font-size: 14px;
+                font-weight: 700;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            #view-admin > #admin-main-content {
+                flex: 1 1 auto !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                min-height: 0 !important;
+                padding: 12px !important;
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #view-admin > #admin-sidebar-mobile { transition: none !important; }
+        }
+
+        /* Stabilkan tampilan Pengaturan Umum di Android.
+           Ukuran font kontrol minimal 16px membantu mencegah browser memperbesar
+           tampilan ketika kolom pengaturan disentuh/difokuskan. */
+        @media screen and (max-width: 768px) {
+            #view-admin input,
+            #view-admin select,
+            #view-admin textarea {
+                font-size: 16px !important;
+                line-height: 1.4 !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                touch-action: manipulation;
+            }
+
+            #view-admin #panel-admin-umum {
+                min-width: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: hidden !important;
+                overflow-wrap: anywhere;
+            }
+
+            #view-admin #panel-admin-umum input,
+            #view-admin #panel-admin-umum select,
+            #view-admin #panel-admin-umum textarea {
+                transform: none !important;
+                zoom: 1 !important;
+            }
         }
 
         /* Penting: aturan pemusatan #view-login tidak boleh mengalahkan kelas hidden.
@@ -363,7 +510,7 @@
     </div>
 
     <div id="view-admin" class="hidden w-full h-screen bg-slate-100 flex-col md:flex-row absolute inset-0">
-        <div class="w-full md:w-64 bg-slate-800 text-white flex flex-col shadow-xl z-10 shrink-0">
+        <div id="admin-sidebar-mobile" class="w-full md:w-64 bg-slate-800 text-white flex flex-col shadow-xl z-10 shrink-0">
             <div class="p-6 border-b border-slate-700">
                 <div class="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-700 border-4 border-blue-300/50 shadow-lg flex flex-col items-center justify-center mb-3 text-white text-center leading-none">
                     <span class="text-xl font-extrabold tracking-wide">CBT</span>
@@ -391,7 +538,15 @@
             </nav>
         </div>
         
-        <div class="flex-1 p-6 overflow-y-auto">
+        <div id="admin-mobile-backdrop" onclick="tutupSidebarAdminMobile()" aria-hidden="true"></div>
+        <div id="admin-main-content" class="flex-1 p-6 overflow-y-auto">
+            <div id="admin-mobile-toolbar">
+                <button type="button" onclick="toggleSidebarAdminMobile()" aria-label="Buka menu admin" aria-controls="admin-sidebar-mobile" aria-expanded="false" id="admin-mobile-menu-button">
+                    <span aria-hidden="true">☰</span>
+                    <span>Menu</span>
+                </button>
+                <span id="admin-mobile-title">Portal Ujian CBT</span>
+            </div>
             <h1 class="text-2xl font-bold text-slate-800 mb-6" id="judul-halaman-admin">Dashboard Ujian</h1>
             
             <div id="panel-admin-dashboard" class="space-y-6">
@@ -1457,7 +1612,25 @@
             document.getElementById('input-token-siswa').value = '';
         }
 
+        function toggleSidebarAdminMobile() {
+            const adminView = document.getElementById("view-admin");
+            if (!adminView) return;
+            const isOpen = adminView.classList.toggle("admin-sidebar-open");
+            const button = document.getElementById("admin-mobile-menu-button");
+            if (button) button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+            document.body.style.overflow = isOpen && window.innerWidth < 768 ? "hidden" : "";
+        }
+
+        function tutupSidebarAdminMobile() {
+            const adminView = document.getElementById("view-admin");
+            if (adminView) adminView.classList.remove("admin-sidebar-open");
+            const button = document.getElementById("admin-mobile-menu-button");
+            if (button) button.setAttribute("aria-expanded", "false");
+            document.body.style.overflow = "";
+        }
+
         function switchTabAdmin(tabId) {
+            if (window.innerWidth < 768) tutupSidebarAdminMobile();
             const tabDashboard = document.getElementById('tab-admin-dashboard');
             const tabStatusTes = document.getElementById('tab-admin-statusTes');
             const tabStatusLogin = document.getElementById('tab-admin-statusLogin');
@@ -3073,6 +3246,10 @@
                     } else showAlert('Error', 'Gagal menyimpan jawaban: ' + response.pesan);
                 }).simpanJawaban(payload);
         }
+        window.addEventListener("resize", function() {
+            if (window.innerWidth >= 768) tutupSidebarAdminMobile();
+        });
+
     </script>
 </body>
 </html>
