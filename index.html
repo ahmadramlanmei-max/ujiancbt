@@ -503,6 +503,90 @@
             #view-admin > div:first-of-type { transition: none !important; }
         }
 
+
+        /* Sidebar geser untuk Ruang Guru pada HP dan tablet sentuh */
+        @media screen and (pointer: coarse), screen and (max-width: 767px) {
+            #view-guru:not(.hidden) {
+                position: fixed !important;
+                inset: 0 !important;
+                width: 100vw !important;
+                max-width: none !important;
+                min-width: 0 !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+                max-height: none !important;
+                min-height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: hidden !important;
+                box-sizing: border-box !important;
+                flex-direction: row !important;
+            }
+            #view-guru.hidden { display: none !important; }
+            #view-guru:not(.hidden) > div:first-of-type {
+                position: fixed !important;
+                inset: 0 auto 0 0 !important;
+                width: min(82vw, 290px) !important;
+                max-width: 290px !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+                max-height: none !important;
+                margin: 0 !important;
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+                box-sizing: border-box !important;
+                transform: translateX(-110%);
+                transition: transform .22s ease;
+                z-index: 10020 !important;
+                padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+            }
+            #view-guru.mobile-nav-open > div:first-of-type {
+                transform: translateX(0) !important;
+            }
+            #view-guru:not(.hidden) > div:nth-of-type(2) {
+                position: absolute !important;
+                inset: 0 !important;
+                width: 100% !important;
+                max-width: none !important;
+                min-width: 0 !important;
+                height: 100% !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                margin: 0 !important;
+                padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)) !important;
+                box-sizing: border-box !important;
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
+            #guru-mobile-menu-toggle {
+                display: inline-flex !important;
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 20 !important;
+                align-items: center;
+                gap: 8px;
+            }
+            #guru-mobile-menu-backdrop {
+                display: none;
+                position: fixed !important;
+                inset: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: 0 !important;
+                background: rgba(15,23,42,.48) !important;
+                z-index: 10010 !important;
+            }
+            #view-guru.mobile-nav-open #guru-mobile-menu-backdrop {
+                display: block !important;
+            }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            #view-guru > div:first-of-type { transition: none !important; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen relative overflow-x-hidden flex items-center justify-center">
@@ -1103,6 +1187,8 @@
     </div>
 
     <div id="view-guru" class="hidden w-full h-screen bg-slate-50 absolute inset-0 flex-col md:flex-row overflow-hidden">
+        <button id="guru-mobile-menu-backdrop" type="button" onclick="toggleGuruMobileMenu(false)" aria-label="Tutup menu Guru" class="hidden"></button>
+
         <div class="w-full md:w-64 bg-indigo-900 text-white flex flex-col shadow-xl z-10 shrink-0">
             <div class="p-6 border-b border-indigo-800">
                 <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center mb-3">
@@ -1124,7 +1210,7 @@
         </div>
 
         <div class="flex-1 p-6 md:p-10 overflow-y-auto">
-            
+            <button id="guru-mobile-menu-toggle" type="button" onclick="toggleGuruMobileMenu(true)" class="hidden mb-4 rounded-lg bg-indigo-900 text-white px-4 py-2 font-semibold shadow-sm">☰ Menu Guru</button>
             <div id="panel-guru-import" class="max-w-5xl mx-auto space-y-6">
                 <div>
                     <h1 class="text-2xl font-bold text-slate-800">Upload Soal via Excel</h1>
@@ -1431,6 +1517,17 @@
 
         // Simpan struktur awal tampilan siswa agar dapat dipulihkan tanpa refresh.
         const viewSiswaTemplate = document.getElementById('view-siswa') ? document.getElementById('view-siswa').innerHTML : '';
+
+        function toggleGuruMobileMenu(open) {
+            const guru = document.getElementById("view-guru");
+            if (!guru) return;
+            const useDrawer = window.innerWidth < 768 ||
+                (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+            const shouldOpen = typeof open === "boolean"
+                ? open
+                : !guru.classList.contains("mobile-nav-open");
+            guru.classList.toggle("mobile-nav-open", shouldOpen && useDrawer);
+        }
 
         function toggleAdminMobileMenu(open) {
             const admin = document.getElementById("view-admin");
@@ -2688,6 +2785,10 @@
                 document.getElementById('tabel-ringkasan-soal').innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-500">Silakan pilih filter Mapel dan Kelas di atas, lalu klik Refresh Data untuk menampilkan soal.</td></tr>';
             }
             if(tabId === 'buat' && editSoalRow === null) bersihkanFormSoal();
+            if (window.innerWidth < 768 || (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)) {
+                const guruView = document.getElementById("view-guru");
+                if (guruView) guruView.classList.remove("mobile-nav-open");
+            }
         }
 
         function downloadTemplateExcel() {
