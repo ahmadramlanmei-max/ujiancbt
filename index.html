@@ -625,7 +625,7 @@
             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
             
             <div class="text-center mb-8">
-                <div class="w-14 h-16 mx-auto flex items-center justify-center mb-4 shrink-0">
+                <div class="w-20 h-24 mx-auto flex items-center justify-center mb-4 shrink-0">
                     <img
                         src="https://commons.wikimedia.org/wiki/Special:FilePath/Lambang_Kabupaten_Katingan.png?width=160"
                         alt="Lambang Kabupaten Katingan"
@@ -1200,14 +1200,18 @@
                     <p class="text-slate-500 mt-1">Lihat jumlah dan persentase jawaban benar/salah untuk setiap soal, berdasarkan kelas dan mata pelajaran.</p>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label for="filter-analisis-kelas" class="block text-sm font-medium text-slate-700 mb-1">Kelas</label>
-                            <select id="filter-analisis-kelas" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"><option value="Semua Kelas">Semua Kelas</option></select>
+                            <select id="filter-analisis-kelas" onchange="perbaruiFilterSiswaAnalisis()" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"><option value="Semua Kelas">Semua Kelas</option></select>
                         </div>
                         <div>
                             <label for="filter-analisis-mapel" class="block text-sm font-medium text-slate-700 mb-1">Mata Pelajaran</label>
-                            <select id="filter-analisis-mapel" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"><option value="Semua Mapel">Semua Mapel</option></select>
+                            <select id="filter-analisis-mapel" onchange="perbaruiFilterSiswaAnalisis()" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"><option value="Semua Mapel">Semua Mapel</option></select>
+                        </div>
+                        <div>
+                            <label for="filter-analisis-siswa" class="block text-sm font-medium text-slate-700 mb-1">Nama Siswa</label>
+                            <select id="filter-analisis-siswa" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"><option value="Semua Siswa">Semua Siswa</option></select>
                         </div>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-3 mt-5">
@@ -2027,6 +2031,7 @@
         }
 
         let cacheAnalisisButirSoalAdmin = [];
+        let daftarSiswaAnalisisAdmin = [];
 
         function siapkanFilterAnalisisButirSoalAdmin() {
             showLoading("Memuat data analisis butir soal...");
@@ -2047,44 +2052,94 @@
                     (res.mapel || []).forEach(function(v) { const o=document.createElement("option"); o.value=v; o.textContent=v; mapelEl.appendChild(o); });
                     if ([...kelasEl.options].some(o => o.value === kelasSebelum)) kelasEl.value = kelasSebelum;
                     if ([...mapelEl.options].some(o => o.value === mapelSebelum)) mapelEl.value = mapelSebelum;
+                    daftarSiswaAnalisisAdmin = res.siswa || [];
+                    perbaruiFilterSiswaAnalisis(res.siswa || []);
                     renderAnalisisButirSoalAdmin(res);
                 })
                 .withFailureHandler(function(err) { hideLoading(); showAlert("Koneksi Gagal", err && err.message ? err.message : "Gagal memuat analisis butir soal."); })
-                .getAnalisisButirSoalAdmin("Semua Kelas", "Semua Mapel");
+                .getAnalisisButirSoalAdmin("Semua Kelas", "Semua Mapel", "Semua Siswa");
+        }
+
+        function perbaruiFilterSiswaAnalisis(sumberSiswa) {
+            const kelas = document.getElementById("filter-analisis-kelas").value || "Semua Kelas";
+            const mapel = document.getElementById("filter-analisis-mapel").value || "Semua Mapel";
+            const siswaEl = document.getElementById("filter-analisis-siswa");
+            const sebelumnya = siswaEl.value || "Semua Siswa";
+            const sumber = Array.isArray(sumberSiswa) ? sumberSiswa : daftarSiswaAnalisisAdmin;
+            siswaEl.innerHTML = '<option value="Semua Siswa">Semua Siswa (Analisis Per Kelas)</option>';
+            sumber.filter(function(s) {
+                return (!kelas || kelas === "Semua Kelas" || s.kelas === kelas) &&
+                       (!mapel || mapel === "Semua Mapel" || s.mapel === mapel);
+            }).forEach(function(s) {
+                const o = document.createElement("option");
+                o.value = s.value;
+                o.textContent = s.nama + (s.kelas ? " — Kelas " + s.kelas : "");
+                siswaEl.appendChild(o);
+            });
+            if ([...siswaEl.options].some(o => o.value === sebelumnya)) siswaEl.value = sebelumnya;
         }
 
         function muatAnalisisButirSoalAdmin() {
             const kelas = document.getElementById("filter-analisis-kelas").value || "Semua Kelas";
             const mapel = document.getElementById("filter-analisis-mapel").value || "Semua Mapel";
+            const siswa = document.getElementById("filter-analisis-siswa").value || "Semua Siswa";
             showLoading("Menghitung analisis jawaban siswa...");
             google.script.run
-                .withSuccessHandler(function(res) { hideLoading(); if (!res || !res.status) { showAlert("Gagal", "Analisis tidak dapat dimuat."); return; } renderAnalisisButirSoalAdmin(res); })
+                .withSuccessHandler(function(res) { hideLoading(); if (!res || !res.status) { showAlert("Gagal", "Analisis tidak dapat dimuat."); return; } daftarSiswaAnalisisAdmin = res.siswa || daftarSiswaAnalisisAdmin; perbaruiFilterSiswaAnalisis(daftarSiswaAnalisisAdmin); document.getElementById("filter-analisis-siswa").value = siswa; renderAnalisisButirSoalAdmin(res); })
                 .withFailureHandler(function(err) { hideLoading(); showAlert("Koneksi Gagal", err && err.message ? err.message : "Gagal mengambil analisis butir soal."); })
-                .getAnalisisButirSoalAdmin(kelas, mapel);
+                .getAnalisisButirSoalAdmin(kelas, mapel, siswa);
         }
 
         function renderAnalisisButirSoalAdmin(res) {
             cacheAnalisisButirSoalAdmin = res.analisis || [];
+            const individual = (document.getElementById("filter-analisis-siswa").value || "Semua Siswa") !== "Semua Siswa";
             const tbody = document.getElementById("tabel-analisis-butir-soal");
+            const theadRow = document.querySelector("#panel-admin-analisisSoal table thead tr");
             tbody.innerHTML = "";
-            const totalBenar = cacheAnalisisButirSoalAdmin.reduce((sum,x) => sum + Number(x.benar || 0), 0);
-            const totalSalah = cacheAnalisisButirSoalAdmin.reduce((sum,x) => sum + Number(x.salah || 0), 0);
+            if (theadRow) {
+                theadRow.innerHTML = "";
+                const headers = individual
+                    ? ["No.", "Nama Siswa", "Kelas", "Mata Pelajaran", "Soal", "Tipe", "Jawaban Siswa", "Status"]
+                    : ["No.", "Kelas", "Mata Pelajaran", "Soal", "Tipe", "Benar", "Salah", "% Benar", "% Salah"];
+                headers.forEach(function(h) { const th=document.createElement("th"); th.className="p-3 font-semibold"; th.textContent=h; theadRow.appendChild(th); });
+            }
+            const totalBenar = individual
+                ? cacheAnalisisButirSoalAdmin.filter(x => String(x.status || "") === "Benar").length
+                : cacheAnalisisButirSoalAdmin.reduce((sum,x) => sum + Number(x.benar || 0), 0);
+            const totalSalah = individual
+                ? cacheAnalisisButirSoalAdmin.filter(x => String(x.status || "") !== "Benar").length
+                : cacheAnalisisButirSoalAdmin.reduce((sum,x) => sum + Number(x.salah || 0), 0);
             document.getElementById("analisis-total-butir").textContent = cacheAnalisisButirSoalAdmin.length;
             document.getElementById("analisis-total-benar").textContent = totalBenar;
             document.getElementById("analisis-total-salah").textContent = totalSalah;
             const info = document.getElementById("analisis-soal-info");
             info.textContent = cacheAnalisisButirSoalAdmin.length
-                ? "Dianalisis " + cacheAnalisisButirSoalAdmin.length + " butir soal dari data jawaban siswa yang tersedia."
+                ? (individual
+                    ? "Analisis jawaban individu: " + (cacheAnalisisButirSoalAdmin[0].nama || "siswa") + ". Ditampilkan jawaban per soal."
+                    : "Dianalisis " + cacheAnalisisButirSoalAdmin.length + " butir soal dari data jawaban siswa yang tersedia.")
                 : "Belum ada data analisis per butir untuk filter ini. Data akan mulai tercatat setelah siswa mengumpulkan ujian menggunakan versi backend yang diperbarui.";
+            const emptyCols = individual ? 8 : 9;
             if (!cacheAnalisisButirSoalAdmin.length) {
-                tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-500">Belum ada data analisis untuk pilihan kelas dan mata pelajaran ini.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="' + emptyCols + '" class="p-8 text-center text-slate-500">Belum ada data analisis untuk pilihan kelas, mata pelajaran, dan siswa ini.</td></tr>';
                 return;
             }
             cacheAnalisisButirSoalAdmin.forEach(function(item,index) {
                 const tr=document.createElement("tr");
-                tr.className = Number(item.persenSalah) >= 50 ? "bg-rose-50 hover:bg-rose-100" : "hover:bg-slate-50";
-                const cells=[index+1,item.kelas,item.mapel,"Soal "+item.idSoal+": "+item.pertanyaan,item.tipe,item.benar,item.salah,(item.persenBenar||0)+"%",(item.persenSalah||0)+"%"];
-                cells.forEach(function(value,i) { const td=document.createElement("td"); td.className="p-3 "+(i===3?"min-w-[280px] whitespace-normal":"whitespace-nowrap"); td.textContent=value==null?"":String(value); if(i===6 && Number(item.salah)>0) td.className+=" text-rose-700 font-semibold"; tr.appendChild(td); });
+                tr.className = String(item.status || "") === "Benar" ? "hover:bg-emerald-50" : (Number(item.persenSalah) >= 50 || individual ? "bg-rose-50 hover:bg-rose-100" : "hover:bg-slate-50");
+                let cells;
+                if (individual) {
+                    cells=[index+1,item.nama,item.kelas,item.mapel,"Soal "+item.idSoal+": "+item.pertanyaan,item.tipe,item.jawabanSiswa || "(Tidak dijawab)",item.status || "-"];
+                } else {
+                    cells=[index+1,item.kelas,item.mapel,"Soal "+item.idSoal+": "+item.pertanyaan,item.tipe,item.benar,item.salah,(item.persenBenar||0)+"%",(item.persenSalah||0)+"%"];
+                }
+                cells.forEach(function(value,i) {
+                    const td=document.createElement("td");
+                    td.className="p-3 "+((individual ? i===4 : i===3)?"min-w-[280px] whitespace-normal":"whitespace-nowrap");
+                    td.textContent=value==null?"":String(value);
+                    if (individual && i===7) td.className += String(item.status)==="Benar" ? " text-emerald-700 font-semibold" : " text-rose-700 font-semibold";
+                    if (!individual && i===6 && Number(item.salah)>0) td.className+=" text-rose-700 font-semibold";
+                    tr.appendChild(td);
+                });
                 tbody.appendChild(tr);
             });
         }
@@ -2092,11 +2147,15 @@
         function downloadAnalisisButirSoalExcel() {
             if (!window.XLSX) { showAlert("Komponen Excel Tidak Tersedia", "Pustaka Excel belum berhasil dimuat. Periksa koneksi internet, lalu coba lagi."); return; }
             if (!cacheAnalisisButirSoalAdmin.length) { showAlert("Tidak Ada Data", "Tampilkan analisis yang berisi data terlebih dahulu."); return; }
-            const rows=cacheAnalisisButirSoalAdmin.map(function(x,i){ return {"No.":i+1,"Kelas":x.kelas,"Mata Pelajaran":x.mapel,"ID Soal":x.idSoal,"Pertanyaan":x.pertanyaan,"Tipe":x.tipe,"Jumlah Benar":x.benar,"Jumlah Salah":x.salah,"Persen Benar":(x.persenBenar||0)+"%","Persen Salah":(x.persenSalah||0)+"%"}; });
+            const individual = (document.getElementById("filter-analisis-siswa").value || "Semua Siswa") !== "Semua Siswa";
+            const rows=cacheAnalisisButirSoalAdmin.map(function(x,i){
+                if (individual) return {"No.":i+1,"Nama Siswa":x.nama,"Kelas":x.kelas,"Mata Pelajaran":x.mapel,"ID Soal":x.idSoal,"Pertanyaan":x.pertanyaan,"Tipe":x.tipe,"Jawaban Siswa":x.jawabanSiswa,"Status":x.status};
+                return {"No.":i+1,"Kelas":x.kelas,"Mata Pelajaran":x.mapel,"ID Soal":x.idSoal,"Pertanyaan":x.pertanyaan,"Tipe":x.tipe,"Jumlah Benar":x.benar,"Jumlah Salah":x.salah,"Persen Benar":(x.persenBenar||0)+"%","Persen Salah":(x.persenSalah||0)+"%"};
+            });
             const ws=XLSX.utils.json_to_sheet(rows); ws["!cols"]=[{wch:6},{wch:12},{wch:26},{wch:12},{wch:60},{wch:12},{wch:14},{wch:14},{wch:14},{wch:14}];
             const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Analisis Butir Soal");
             const safe=function(s){return String(s).replace(/[\\/:*?"<>|]+/g,"-").replace(/\s+/g,"_");};
-            XLSX.writeFile(wb,"Analisis_Butir_Soal_"+safe(document.getElementById("filter-analisis-kelas").value)+"_"+safe(document.getElementById("filter-analisis-mapel").value)+".xlsx");
+            XLSX.writeFile(wb,"Analisis_Butir_Soal_"+safe(document.getElementById("filter-analisis-kelas").value)+"_"+safe(document.getElementById("filter-analisis-mapel").value)+"_"+safe(document.getElementById("filter-analisis-siswa").value)+".xlsx");
         }
 
         function downloadHasilUjianExcel() {
