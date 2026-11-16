@@ -587,6 +587,50 @@
         @media (prefers-reduced-motion: reduce) {
             #view-guru > div:first-of-type { transition: none !important; }
         }
+
+        /* FIX KHUSUS HALAMAN MENJAWAB SOAL DI HP/TABLET
+           Body memang dikunci untuk tampilan aplikasi, sehingga area ujian siswa
+           harus menjadi kontainer scroll tersendiri. Aturan ini tidak mengubah
+           halaman Admin, Guru, Login, maupun fungsi ujian. */
+        @media screen and (pointer: coarse), screen and (max-width: 767px) {
+            #view-siswa:not(.hidden) {
+                position: fixed !important;
+                inset: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+                min-height: 0 !important;
+                max-height: 100dvh !important;
+                display: flex !important;
+                flex-direction: column !important;
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                overscroll-behavior-y: contain;
+                box-sizing: border-box !important;
+            }
+
+            #view-siswa > header {
+                position: sticky !important;
+                top: 0 !important;
+                flex: 0 0 auto !important;
+                width: 100% !important;
+                z-index: 20 !important;
+            }
+
+            #view-siswa > main {
+                flex: 0 0 auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                min-height: max-content !important;
+                height: auto !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                box-sizing: border-box !important;
+            }
+        }
+
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen relative overflow-x-hidden flex items-center justify-center">
