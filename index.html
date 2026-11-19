@@ -1657,6 +1657,104 @@
             catch (e) { console.warn('Token sesi lokal tidak dapat dihapus.', e); }
         }
 
+        // Identitas admin disimpan terpisah dari token. Kata sandi TIDAK disimpan.
+        // Saat halaman di-refresh, identitas ini dipakai untuk menemukan token perangkat,
+        // lalu token tetap harus diverifikasi ke server sebelum dashboard dibuka.
+        const KUNCI_PROFIL_ADMIN_LOKAL = 'cbt_admin_session_profile_v1';
+
+        function simpanProfilAdminLokal(user) {
+            try {
+                if (!user || user.role !== 'admin' || !user.nisn || !user.sessionToken) return;
+                localStorage.setItem(KUNCI_PROFIL_ADMIN_LOKAL, JSON.stringify({
+                    nisn: String(user.nisn),
+                    nama: String(user.nama || 'Administrator'),
+                    role: 'admin'
+                }));
+                simpanSessionLokal(user.nisn, user.sessionToken);
+            } catch (e) {
+                console.warn('Profil sesi admin tidak dapat disimpan.', e);
+            }
+        }
+
+        function ambilProfilAdminLokal() {
+            try {
+                const raw = localStorage.getItem(KUNCI_PROFIL_ADMIN_LOKAL);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                if (!data || !data.nisn || data.role !== 'admin') return null;
+                return data;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function hapusProfilAdminLokal() {
+            try { localStorage.removeItem(KUNCI_PROFIL_ADMIN_LOKAL); }
+            catch (e) { console.warn('Profil sesi admin lokal tidak dapat dihapus.', e); }
+        }
+
+        // Pulihkan sesi admin setelah refresh. Token tidak langsung dipercaya:
+        // getCurrentTokenInfo memanggil validasiSessionAdmin_ di server.
+        let pemulihanSessionAdminBerjalan = false;
+        function pulihkanSessionAdminOtomatis() {
+            if (pemulihanSessionAdminBerjalan || typeof google === 'undefined' || !google.script || !google.script.run) return;
+            const profil = ambilProfilAdminLokal();
+            if (!profil) return;
+
+            const token = ambilSessionLokal(profil.nisn);
+            if (!token) {
+                hapusProfilAdminLokal();
+                return;
+            }
+
+            pemulihanSessionAdminBerjalan = true;
+            showLoading('Memulihkan sesi admin...');
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    pemulihanSessionAdminBerjalan = false;
+                    hideLoading();
+
+                    if (res && res.token && res.nextChange) {
+                        currUser = {
+                            status: true,
+                            role: 'admin',
+                            nisn: String(profil.nisn),
+                            nama: profil.nama || 'Administrator',
+                            sessionToken: token
+                        };
+                        const loginView = document.getElementById('view-login');
+                        const adminView = document.getElementById('view-admin');
+                        if (loginView) {
+                            loginView.classList.add('hidden');
+                            loginView.classList.remove('flex');
+                        }
+                        if (adminView) {
+                            adminView.classList.remove('hidden');
+                            adminView.classList.add('flex');
+                        }
+                        const namaAdmin = document.getElementById('admin-name');
+                        if (namaAdmin) namaAdmin.textContent = currUser.nama;
+                        simpanProfilAdminLokal(currUser);
+                        switchTabAdmin('dashboard');
+                        // Perbarui token tampilan dengan token yang juga memvalidasi sesi.
+                        updateAdminToken();
+                    } else {
+                        // Sesi memang sudah dicabut/tidak dikenal. Hapus hanya token
+                        // perangkat ini; sesi admin pada perangkat lain tetap aktif.
+                        hapusSessionLokal(profil.nisn);
+                        hapusProfilAdminLokal();
+                        currUser = {};
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    pemulihanSessionAdminBerjalan = false;
+                    hideLoading();
+                    // Gangguan jaringan tidak dianggap sebagai pencabutan sesi.
+                    console.warn('Pemulihan sesi admin gagal karena koneksi/server:', err);
+                })
+                .getCurrentTokenInfo(profil.nisn, token);
+        }
+
         function logoutAplikasi() {
             // Hentikan timer/interval yang masih aktif tanpa me-refresh halaman.
             if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
@@ -1667,8 +1765,13 @@
             // tidak dicabut agar siswa dapat login kembali dari perangkat yang sama.
             const userKeluar = currUser || {};
             if (userKeluar.role === 'admin' && userKeluar.sessionToken) {
-                google.script.run.akhiriSessionSiswa(userKeluar.nisn, userKeluar.sessionToken);
+                // Cabut hanya sesi admin pada perangkat ini. Jangan memengaruhi
+                // sesi admin lain yang masih aktif pada perangkat berbeda.
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run.akhiriSessionSiswa(userKeluar.nisn, userKeluar.sessionToken);
+                }
                 hapusSessionLokal(userKeluar.nisn);
+                hapusProfilAdminLokal();
             }
 
             isUjianAktif = false;
@@ -1872,7 +1975,10 @@
                         hideLoading();
                         if (response.status) {
                             currUser = response;
-                            if (response.sessionToken) simpanSessionLokal(response.nisn || user, response.sessionToken);
+                            if (response.sessionToken) {
+                                simpanSessionLokal(response.nisn || user, response.sessionToken);
+                                if (response.role === 'admin') simpanProfilAdminLokal(response);
+                            }
                             document.getElementById('view-login').classList.add('hidden');
                             
                             if (response.role === 'admin') {
@@ -3680,6 +3786,10 @@
                     } else showAlert('Error', 'Gagal menyimpan jawaban: ' + response.pesan);
                 }).simpanJawaban(payload);
         }
+        // Jalankan pemulihan setelah seluruh elemen halaman tersedia.
+        window.addEventListener('load', function() {
+            pulihkanSessionAdminOtomatis();
+        });
     </script>
 </body>
 </html>
