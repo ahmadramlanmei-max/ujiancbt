@@ -1637,11 +1637,39 @@
             admin.classList.toggle("mobile-nav-open", shouldOpen && useDrawer);
         }
 
+        // Token sesi disimpan per akun pada browser/perangkat ini.
+        // Token siswa dipertahankan saat keluar sebelum ujian selesai agar login ulang
+        // dari perangkat yang sama tidak dianggap sebagai perangkat baru.
+        function kunciSessionLokal(nisn) {
+            return 'cbt_session_token_' + String(nisn || '').trim();
+        }
+        function ambilSessionLokal(nisn) {
+            try { return localStorage.getItem(kunciSessionLokal(nisn)) || ''; }
+            catch (e) { return ''; }
+        }
+        function simpanSessionLokal(nisn, token) {
+            try {
+                if (nisn && token) localStorage.setItem(kunciSessionLokal(nisn), String(token));
+            } catch (e) { console.warn('Token sesi tidak dapat disimpan di browser.', e); }
+        }
+        function hapusSessionLokal(nisn) {
+            try { if (nisn) localStorage.removeItem(kunciSessionLokal(nisn)); }
+            catch (e) { console.warn('Token sesi lokal tidak dapat dihapus.', e); }
+        }
+
         function logoutAplikasi() {
             // Hentikan timer/interval yang masih aktif tanpa me-refresh halaman.
             if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
             if (cheatTimerInterval) { clearInterval(cheatTimerInterval); cheatTimerInterval = null; }
             if (adminTokenInterval) { clearInterval(adminTokenInterval); adminTokenInterval = null; }
+
+            // Tutup sesi admin/proktor pada server saat logout. Sesi siswa sengaja
+            // tidak dicabut agar siswa dapat login kembali dari perangkat yang sama.
+            const userKeluar = currUser || {};
+            if (userKeluar.role === 'admin' && userKeluar.sessionToken) {
+                google.script.run.akhiriSessionSiswa(userKeluar.nisn, userKeluar.sessionToken);
+                hapusSessionLokal(userKeluar.nisn);
+            }
 
             isUjianAktif = false;
             isAway = false;
@@ -1758,6 +1786,7 @@
                         progressServerSedangSimpan = false;
                     }).simpanProgressUjian({
                         nisn: currUser.nisn,
+                        sessionToken: currUser.sessionToken,
                         nama: currUser.nama,
                         kelas: currUser.kelas,
                         sesi: currUser.sesi,
@@ -1836,12 +1865,14 @@
             if(!user || !pass) return;
 
             showLoading('Memverifikasi...');
+            const tokenPerangkat = ambilSessionLokal(user);
             if (typeof google !== 'undefined') {
                 google.script.run
                     .withSuccessHandler(function(response) {
                         hideLoading();
                         if (response.status) {
                             currUser = response;
+                            if (response.sessionToken) simpanSessionLokal(response.nisn || user, response.sessionToken);
                             document.getElementById('view-login').classList.add('hidden');
                             
                             if (response.role === 'admin') {
@@ -1859,7 +1890,7 @@
                                 document.getElementById('view-token').classList.add('flex');
                             }
                         } else showAlert('Login Gagal', response.pesan);
-                    }).prosesLogin(user, pass);
+                    }).prosesLogin(user, pass, tokenPerangkat);
             } else {
                 hideLoading(); showAlert('Mode Offline', 'Jalankan dari Google Apps Script untuk akses Database.');
             }
@@ -1880,7 +1911,7 @@
                     } else {
                         showAlert('Token Ditolak', res.pesan);
                     }
-                }).verifikasiTokenClient(token, currUser.nisn);
+                }).verifikasiTokenClient(token, currUser.nisn, currUser.sessionToken);
         }
 
         function batalTokenSiswa() {
@@ -2333,7 +2364,7 @@
                         </tr>
                     `);
                 });
-            }).getStatusLoginAdmin();
+            }).getStatusLoginAdmin(currUser.nisn, currUser.sessionToken);
         }
 
         function resetLoginTerpilih() {
@@ -2361,7 +2392,7 @@
                 } else {
                     showAlert("Error", (res && res.pesan) ? res.pesan : "Reset login gagal.");
                 }
-            }).resetLoginSiswaAdmin(nisnList);
+            }).resetLoginSiswaAdmin(nisnList, currUser.nisn, currUser.sessionToken);
         }
 
         function loadDashboardAdmin() {
@@ -2387,7 +2418,7 @@
                     loadDashboardAdmin();
                     showAlert("Sukses", res.pesan);
                 }
-            }).resetStatusAktivitas();
+            }).resetStatusAktivitas(currUser.nisn, currUser.sessionToken);
         }
 
         function updateAdminToken() {
@@ -2410,7 +2441,7 @@
                     let s = (diff % 60).toString().padStart(2, '0');
                     document.getElementById('admin-token-timer').textContent = m + ":" + s;
                 }, 1000);
-            }).getCurrentTokenInfo();
+            }).getCurrentTokenInfo(currUser.nisn, currUser.sessionToken);
         }
 
         function loadDataAdmin() {
@@ -3408,7 +3439,7 @@
                         isUjianAktif = true;
                         mulaiTimer(); renderGrid(); renderSoal(indexSaatIni);
                     } else showAlert('Kosong', 'Belum ada soal ujian untuk kelas Anda.');
-                }).ambilSoal(currUser.kelas, currUser.nisn, currUser.sesi);
+                }).ambilSoal(currUser.kelas, currUser.nisn, currUser.sesi, currUser.sessionToken);
         }
 
         function mulaiTimer() {
@@ -3618,7 +3649,7 @@
             
             if (waktuHabis) showAlert('Waktu Habis / Dihentikan', 'Waktu ujian telah berakhir atau terjadi pelanggaran. Jawaban dikirim otomatis.');
             
-            const payload = { nisn: currUser.nisn, nama: currUser.nama, kelas: currUser.kelas, sesi: currUser.sesi, jawaban: jawabanSiswa };
+            const payload = { nisn: currUser.nisn, nama: currUser.nama, kelas: currUser.kelas, sesi: currUser.sesi, jawaban: jawabanSiswa, sessionToken: currUser.sessionToken };
 
             showLoading('Menyimpan dan Menilai Jawaban Anda...');
             google.script.run
@@ -3626,6 +3657,7 @@
                     hideLoading();
                     if(response.status) {
                         localStorage.removeItem('cbt_state_' + currUser.nisn);
+                        hapusSessionLokal(currUser.nisn);
                         document.getElementById('view-siswa').innerHTML = `
                             <div class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
                                 <div class="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-sm">
