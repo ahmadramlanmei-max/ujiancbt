@@ -1640,8 +1640,12 @@
         // Token sesi disimpan per akun pada browser/perangkat ini.
         // Token siswa dipertahankan saat keluar sebelum ujian selesai agar login ulang
         // dari perangkat yang sama tidak dianggap sebagai perangkat baru.
+        function normalisasiNISNClient(nisn) {
+            const nilai = String(nisn == null ? '' : nisn).replace(/[\s\u00A0\u200B-\u200D\uFEFF]/g, '').trim();
+            return /^\d+$/.test(nilai) && nilai.length < 10 ? nilai.padStart(10, '0') : nilai;
+        }
         function kunciSessionLokal(nisn) {
-            return 'cbt_session_token_' + String(nisn || '').trim();
+            return 'cbt_session_token_' + normalisasiNISNClient(nisn);
         }
         function ambilSessionLokal(nisn) {
             try { return localStorage.getItem(kunciSessionLokal(nisn)) || ''; }
@@ -1963,9 +1967,10 @@
         }
 
         function attemptLogin() {
-            const user = document.getElementById('nisn').value.trim();
+            const userInput = document.getElementById('nisn').value.trim();
             const pass = document.getElementById('password').value.trim();
-            if(!user || !pass) return;
+            if(!userInput || !pass) return;
+            const user = normalisasiNISNClient(userInput);
 
             showLoading('Memverifikasi...');
             const tokenPerangkat = ambilSessionLokal(user);
@@ -1979,6 +1984,10 @@
                         hideLoading();
                         if (response && response.status) {
                             currUser = response;
+                            if (response.role === 'siswa') {
+                                response.nisn = normalisasiNISNClient(response.nisn || userInput);
+                                currUser.nisn = response.nisn;
+                            }
                             if (response.role === 'siswa' && !response.sessionToken) {
                                 currUser = {};
                                 showAlert('Session Gagal', 'Server tidak mengirim token sesi siswa. Silakan hubungi proktor.');
