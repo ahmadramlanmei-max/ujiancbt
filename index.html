@@ -1666,6 +1666,87 @@
         // lalu token tetap harus diverifikasi ke server sebelum dashboard dibuka.
         const KUNCI_PROFIL_ADMIN_LOKAL = 'cbt_admin_session_profile_v1';
 
+        const KUNCI_PROFIL_SISWA_LOKAL = 'cbt_student_session_profile_v1';
+        function simpanProfilSiswaLokal(user) {
+            try {
+                if (!user || user.role !== 'siswa' || !user.nisn || !user.sessionToken) return;
+                const profil = {
+                    nisn: normalisasiNISNClient(user.nisn),
+                    nama: String(user.nama || ''),
+                    kelas: String(user.kelas || ''),
+                    sesi: String(user.sesi || ''),
+                    role: 'siswa'
+                };
+                localStorage.setItem(KUNCI_PROFIL_SISWA_LOKAL, JSON.stringify(profil));
+                simpanSessionLokal(profil.nisn, user.sessionToken);
+            } catch (e) { console.warn('Profil siswa tidak dapat disimpan.', e); }
+        }
+        function ambilProfilSiswaLokal() {
+            try {
+                const raw = localStorage.getItem(KUNCI_PROFIL_SISWA_LOKAL);
+                if (!raw) return null;
+                const p = JSON.parse(raw);
+                if (!p || !p.nisn || p.role !== 'siswa') return null;
+                p.nisn = normalisasiNISNClient(p.nisn);
+                return p;
+            } catch (e) { return null; }
+        }
+        function hapusProfilSiswaLokal() {
+            try { localStorage.removeItem(KUNCI_PROFIL_SISWA_LOKAL); } catch (e) {}
+        }
+        function kunciIzinUjianLokal(nisn) {
+            return 'cbt_exam_authorized_' + normalisasiNISNClient(nisn);
+        }
+
+        // Pulihkan sesi siswa secara otomatis setelah refresh. Server tetap memvalidasi
+        // token sehingga profil yang tersimpan di browser tidak dapat membuka akun sendiri.
+        let pemulihanSessionSiswaBerjalan = false;
+        function pulihkanSessionSiswaOtomatis() {
+            if (pemulihanSessionSiswaBerjalan || typeof google === 'undefined' || !google.script || !google.script.run) return;
+            const profil = ambilProfilSiswaLokal();
+            if (!profil) return;
+            const token = ambilSessionLokal(profil.nisn);
+            if (!token) { hapusProfilSiswaLokal(); return; }
+
+            pemulihanSessionSiswaBerjalan = true;
+            showLoading('Memulihkan sesi siswa...');
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    pemulihanSessionSiswaBerjalan = false;
+                    hideLoading();
+                    if (!res || !res.status || !res.sessionToken) {
+                        // Hapus kredensial lokal hanya jika server menyatakan sesi tidak valid.
+                        if (res && res.sessionInvalid) {
+                            hapusSessionLokal(profil.nisn);
+                            hapusProfilSiswaLokal();
+                            localStorage.removeItem(kunciIzinUjianLokal(profil.nisn));
+                        }
+                        return;
+                    }
+                    currUser = res;
+                    simpanProfilSiswaLokal(currUser);
+                    const loginView = document.getElementById('view-login');
+                    if (loginView) { loginView.classList.add('hidden'); loginView.classList.remove('flex'); }
+                    const tokenView = document.getElementById('view-token');
+                    const siswaView = document.getElementById('view-siswa');
+                    const sudahDiizinkan = localStorage.getItem(kunciIzinUjianLokal(currUser.nisn)) === '1';
+                    if (sudahDiizinkan) {
+                        if (tokenView) { tokenView.classList.add('hidden'); tokenView.classList.remove('flex'); }
+                        mulaiSiswa();
+                    } else {
+                        if (tokenView) { tokenView.classList.remove('hidden'); tokenView.classList.add('flex'); }
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    pemulihanSessionSiswaBerjalan = false;
+                    hideLoading();
+                    // Gangguan jaringan tidak menghapus token; siswa dapat mencoba refresh lagi.
+                    console.warn('Pemulihan sesi siswa gagal karena koneksi/server:', err);
+                })
+                .pulihkanSessionSiswa(profil.nisn, token);
+        }
+
+
         function simpanProfilAdminLokal(user) {
             try {
                 if (!user || user.role !== 'admin' || !user.nisn || !user.sessionToken) return;
@@ -1997,6 +2078,7 @@
                                 response.nisn = String(response.nisn || user).trim();
                                 simpanSessionLokal(response.nisn, response.sessionToken);
                                 if (response.role === 'admin') simpanProfilAdminLokal(response);
+                                if (response.role === 'siswa') simpanProfilSiswaLokal(response);
                             }
                             document.getElementById('view-login').classList.add('hidden');
                             
@@ -2038,6 +2120,8 @@
                 .withSuccessHandler(function(res) {
                     hideLoading();
                     if(res && res.status) {
+                        localStorage.setItem(kunciIzinUjianLokal(currUser.nisn), '1');
+                        simpanProfilSiswaLokal(currUser);
                         document.getElementById('view-token').classList.add('hidden');
                         document.getElementById('view-token').classList.remove('flex');
                         mulaiSiswa();
@@ -3791,6 +3875,8 @@
                     if(response.status) {
                         localStorage.removeItem('cbt_state_' + currUser.nisn);
                         hapusSessionLokal(currUser.nisn);
+                        hapusProfilSiswaLokal();
+                        localStorage.removeItem(kunciIzinUjianLokal(currUser.nisn));
                         document.getElementById('view-siswa').innerHTML = `
                             <div class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
                                 <div class="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-sm">
@@ -3816,6 +3902,7 @@
         // Jalankan pemulihan setelah seluruh elemen halaman tersedia.
         window.addEventListener('load', function() {
             pulihkanSessionAdminOtomatis();
+            pulihkanSessionSiswaOtomatis();
         });
     </script>
 </body>
