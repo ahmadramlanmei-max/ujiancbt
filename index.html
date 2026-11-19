@@ -1971,12 +1971,22 @@
             const tokenPerangkat = ambilSessionLokal(user);
             if (typeof google !== 'undefined') {
                 google.script.run
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showAlert('Koneksi Gagal', (error && error.message) ? error.message : 'Tidak dapat menghubungi server.');
+                    })
                     .withSuccessHandler(function(response) {
                         hideLoading();
-                        if (response.status) {
+                        if (response && response.status) {
                             currUser = response;
+                            if (response.role === 'siswa' && !response.sessionToken) {
+                                currUser = {};
+                                showAlert('Session Gagal', 'Server tidak mengirim token sesi siswa. Silakan hubungi proktor.');
+                                return;
+                            }
                             if (response.sessionToken) {
-                                simpanSessionLokal(response.nisn || user, response.sessionToken);
+                                response.nisn = String(response.nisn || user).trim();
+                                simpanSessionLokal(response.nisn, response.sessionToken);
                                 if (response.role === 'admin') simpanProfilAdminLokal(response);
                             }
                             document.getElementById('view-login').classList.add('hidden');
@@ -2006,11 +2016,19 @@
             const token = document.getElementById('input-token-siswa').value.trim();
             if(!token) return showAlert('Peringatan', 'Harap masukkan token terlebih dahulu!');
             
+            if (!currUser || !currUser.nisn || !currUser.sessionToken) {
+                showAlert('Session Tidak Valid', 'Token sesi perangkat tidak ditemukan. Silakan login kembali.');
+                return;
+            }
             showLoading('Mengecek Token...');
             google.script.run
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    showAlert('Koneksi Gagal', (error && error.message) ? error.message : 'Tidak dapat menghubungi server.');
+                })
                 .withSuccessHandler(function(res) {
                     hideLoading();
-                    if(res.status) {
+                    if(res && res.status) {
                         document.getElementById('view-token').classList.add('hidden');
                         document.getElementById('view-token').classList.remove('flex');
                         mulaiSiswa();
