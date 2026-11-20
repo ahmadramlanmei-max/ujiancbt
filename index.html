@@ -1640,12 +1640,8 @@
         // Token sesi disimpan per akun pada browser/perangkat ini.
         // Token siswa dipertahankan saat keluar sebelum ujian selesai agar login ulang
         // dari perangkat yang sama tidak dianggap sebagai perangkat baru.
-        function normalisasiNISNClient(nisn) {
-            const nilai = String(nisn == null ? '' : nisn).replace(/[\s\u00A0\u200B-\u200D\uFEFF]/g, '').trim();
-            return /^\d+$/.test(nilai) && nilai.length < 10 ? nilai.padStart(10, '0') : nilai;
-        }
         function kunciSessionLokal(nisn) {
-            return 'cbt_session_token_' + normalisasiNISNClient(nisn);
+            return 'cbt_session_token_' + String(nisn || '').trim();
         }
         function ambilSessionLokal(nisn) {
             try { return localStorage.getItem(kunciSessionLokal(nisn)) || ''; }
@@ -1661,185 +1657,6 @@
             catch (e) { console.warn('Token sesi lokal tidak dapat dihapus.', e); }
         }
 
-        // Identitas admin disimpan terpisah dari token. Kata sandi TIDAK disimpan.
-        // Saat halaman di-refresh, identitas ini dipakai untuk menemukan token perangkat,
-        // lalu token tetap harus diverifikasi ke server sebelum dashboard dibuka.
-        const KUNCI_PROFIL_ADMIN_LOKAL = 'cbt_admin_session_profile_v1';
-
-        const KUNCI_PROFIL_SISWA_LOKAL = 'cbt_student_session_profile_v1';
-        function simpanProfilSiswaLokal(user) {
-            try {
-                if (!user || user.role !== 'siswa' || !user.nisn || !user.sessionToken) return;
-                const profil = {
-                    nisn: normalisasiNISNClient(user.nisn),
-                    nama: String(user.nama || ''),
-                    kelas: String(user.kelas || ''),
-                    sesi: String(user.sesi || ''),
-                    role: 'siswa'
-                };
-                localStorage.setItem(KUNCI_PROFIL_SISWA_LOKAL, JSON.stringify(profil));
-                simpanSessionLokal(profil.nisn, user.sessionToken);
-            } catch (e) { console.warn('Profil siswa tidak dapat disimpan.', e); }
-        }
-        function ambilProfilSiswaLokal() {
-            try {
-                const raw = localStorage.getItem(KUNCI_PROFIL_SISWA_LOKAL);
-                if (!raw) return null;
-                const p = JSON.parse(raw);
-                if (!p || !p.nisn || p.role !== 'siswa') return null;
-                p.nisn = normalisasiNISNClient(p.nisn);
-                return p;
-            } catch (e) { return null; }
-        }
-        function hapusProfilSiswaLokal() {
-            try { localStorage.removeItem(KUNCI_PROFIL_SISWA_LOKAL); } catch (e) {}
-        }
-        function kunciIzinUjianLokal(nisn) {
-            return 'cbt_exam_authorized_' + normalisasiNISNClient(nisn);
-        }
-
-        // Pulihkan sesi siswa secara otomatis setelah refresh. Server tetap memvalidasi
-        // token sehingga profil yang tersimpan di browser tidak dapat membuka akun sendiri.
-        let pemulihanSessionSiswaBerjalan = false;
-        function pulihkanSessionSiswaOtomatis() {
-            if (pemulihanSessionSiswaBerjalan || typeof google === 'undefined' || !google.script || !google.script.run) return;
-            const profil = ambilProfilSiswaLokal();
-            if (!profil) return;
-            const token = ambilSessionLokal(profil.nisn);
-            if (!token) { hapusProfilSiswaLokal(); return; }
-
-            pemulihanSessionSiswaBerjalan = true;
-            showLoading('Memulihkan sesi siswa...');
-            google.script.run
-                .withSuccessHandler(function(res) {
-                    pemulihanSessionSiswaBerjalan = false;
-                    hideLoading();
-                    if (!res || !res.status || !res.sessionToken) {
-                        // Hapus kredensial lokal hanya jika server menyatakan sesi tidak valid.
-                        if (res && res.sessionInvalid) {
-                            hapusSessionLokal(profil.nisn);
-                            hapusProfilSiswaLokal();
-                            localStorage.removeItem(kunciIzinUjianLokal(profil.nisn));
-                        }
-                        return;
-                    }
-                    currUser = res;
-                    simpanProfilSiswaLokal(currUser);
-                    const loginView = document.getElementById('view-login');
-                    if (loginView) { loginView.classList.add('hidden'); loginView.classList.remove('flex'); }
-                    const tokenView = document.getElementById('view-token');
-                    const siswaView = document.getElementById('view-siswa');
-                    const sudahDiizinkan = localStorage.getItem(kunciIzinUjianLokal(currUser.nisn)) === '1';
-                    if (sudahDiizinkan) {
-                        if (tokenView) { tokenView.classList.add('hidden'); tokenView.classList.remove('flex'); }
-                        mulaiSiswa();
-                    } else {
-                        if (tokenView) { tokenView.classList.remove('hidden'); tokenView.classList.add('flex'); }
-                    }
-                })
-                .withFailureHandler(function(err) {
-                    pemulihanSessionSiswaBerjalan = false;
-                    hideLoading();
-                    // Gangguan jaringan tidak menghapus token; siswa dapat mencoba refresh lagi.
-                    console.warn('Pemulihan sesi siswa gagal karena koneksi/server:', err);
-                })
-                .pulihkanSessionSiswa(profil.nisn, token);
-        }
-
-
-        function simpanProfilAdminLokal(user) {
-            try {
-                if (!user || user.role !== 'admin' || !user.nisn || !user.sessionToken) return;
-                localStorage.setItem(KUNCI_PROFIL_ADMIN_LOKAL, JSON.stringify({
-                    nisn: String(user.nisn),
-                    nama: String(user.nama || 'Administrator'),
-                    role: 'admin'
-                }));
-                simpanSessionLokal(user.nisn, user.sessionToken);
-            } catch (e) {
-                console.warn('Profil sesi admin tidak dapat disimpan.', e);
-            }
-        }
-
-        function ambilProfilAdminLokal() {
-            try {
-                const raw = localStorage.getItem(KUNCI_PROFIL_ADMIN_LOKAL);
-                if (!raw) return null;
-                const data = JSON.parse(raw);
-                if (!data || !data.nisn || data.role !== 'admin') return null;
-                return data;
-            } catch (e) {
-                return null;
-            }
-        }
-
-        function hapusProfilAdminLokal() {
-            try { localStorage.removeItem(KUNCI_PROFIL_ADMIN_LOKAL); }
-            catch (e) { console.warn('Profil sesi admin lokal tidak dapat dihapus.', e); }
-        }
-
-        // Pulihkan sesi admin setelah refresh. Token tidak langsung dipercaya:
-        // getCurrentTokenInfo memanggil validasiSessionAdmin_ di server.
-        let pemulihanSessionAdminBerjalan = false;
-        function pulihkanSessionAdminOtomatis() {
-            if (pemulihanSessionAdminBerjalan || typeof google === 'undefined' || !google.script || !google.script.run) return;
-            const profil = ambilProfilAdminLokal();
-            if (!profil) return;
-
-            const token = ambilSessionLokal(profil.nisn);
-            if (!token) {
-                hapusProfilAdminLokal();
-                return;
-            }
-
-            pemulihanSessionAdminBerjalan = true;
-            showLoading('Memulihkan sesi admin...');
-            google.script.run
-                .withSuccessHandler(function(res) {
-                    pemulihanSessionAdminBerjalan = false;
-                    hideLoading();
-
-                    if (res && res.token && res.nextChange) {
-                        currUser = {
-                            status: true,
-                            role: 'admin',
-                            nisn: String(profil.nisn),
-                            nama: profil.nama || 'Administrator',
-                            sessionToken: token
-                        };
-                        const loginView = document.getElementById('view-login');
-                        const adminView = document.getElementById('view-admin');
-                        if (loginView) {
-                            loginView.classList.add('hidden');
-                            loginView.classList.remove('flex');
-                        }
-                        if (adminView) {
-                            adminView.classList.remove('hidden');
-                            adminView.classList.add('flex');
-                        }
-                        const namaAdmin = document.getElementById('admin-name');
-                        if (namaAdmin) namaAdmin.textContent = currUser.nama;
-                        simpanProfilAdminLokal(currUser);
-                        switchTabAdmin('dashboard');
-                        // Perbarui token tampilan dengan token yang juga memvalidasi sesi.
-                        updateAdminToken();
-                    } else {
-                        // Sesi memang sudah dicabut/tidak dikenal. Hapus hanya token
-                        // perangkat ini; sesi admin pada perangkat lain tetap aktif.
-                        hapusSessionLokal(profil.nisn);
-                        hapusProfilAdminLokal();
-                        currUser = {};
-                    }
-                })
-                .withFailureHandler(function(err) {
-                    pemulihanSessionAdminBerjalan = false;
-                    hideLoading();
-                    // Gangguan jaringan tidak dianggap sebagai pencabutan sesi.
-                    console.warn('Pemulihan sesi admin gagal karena koneksi/server:', err);
-                })
-                .getCurrentTokenInfo(profil.nisn, token);
-        }
-
         function logoutAplikasi() {
             // Hentikan timer/interval yang masih aktif tanpa me-refresh halaman.
             if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
@@ -1850,13 +1667,8 @@
             // tidak dicabut agar siswa dapat login kembali dari perangkat yang sama.
             const userKeluar = currUser || {};
             if (userKeluar.role === 'admin' && userKeluar.sessionToken) {
-                // Cabut hanya sesi admin pada perangkat ini. Jangan memengaruhi
-                // sesi admin lain yang masih aktif pada perangkat berbeda.
-                if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run.akhiriSessionSiswa(userKeluar.nisn, userKeluar.sessionToken);
-                }
+                google.script.run.akhiriSessionSiswa(userKeluar.nisn, userKeluar.sessionToken);
                 hapusSessionLokal(userKeluar.nisn);
-                hapusProfilAdminLokal();
             }
 
             isUjianAktif = false;
@@ -2048,38 +1860,19 @@
         }
 
         function attemptLogin() {
-            const userInput = document.getElementById('nisn').value.trim();
+            const user = document.getElementById('nisn').value.trim();
             const pass = document.getElementById('password').value.trim();
-            if(!userInput || !pass) return;
-            const user = normalisasiNISNClient(userInput);
+            if(!user || !pass) return;
 
             showLoading('Memverifikasi...');
             const tokenPerangkat = ambilSessionLokal(user);
             if (typeof google !== 'undefined') {
                 google.script.run
-                    .withFailureHandler(function(error) {
-                        hideLoading();
-                        showAlert('Koneksi Gagal', (error && error.message) ? error.message : 'Tidak dapat menghubungi server.');
-                    })
                     .withSuccessHandler(function(response) {
                         hideLoading();
-                        if (response && response.status) {
+                        if (response.status) {
                             currUser = response;
-                            if (response.role === 'siswa') {
-                                response.nisn = normalisasiNISNClient(response.nisn || userInput);
-                                currUser.nisn = response.nisn;
-                            }
-                            if (response.role === 'siswa' && !response.sessionToken) {
-                                currUser = {};
-                                showAlert('Session Gagal', 'Server tidak mengirim token sesi siswa. Silakan hubungi proktor.');
-                                return;
-                            }
-                            if (response.sessionToken) {
-                                response.nisn = String(response.nisn || user).trim();
-                                simpanSessionLokal(response.nisn, response.sessionToken);
-                                if (response.role === 'admin') simpanProfilAdminLokal(response);
-                                if (response.role === 'siswa') simpanProfilSiswaLokal(response);
-                            }
+                            if (response.sessionToken) simpanSessionLokal(response.nisn || user, response.sessionToken);
                             document.getElementById('view-login').classList.add('hidden');
                             
                             if (response.role === 'admin') {
@@ -2107,21 +1900,11 @@
             const token = document.getElementById('input-token-siswa').value.trim();
             if(!token) return showAlert('Peringatan', 'Harap masukkan token terlebih dahulu!');
             
-            if (!currUser || !currUser.nisn || !currUser.sessionToken) {
-                showAlert('Session Tidak Valid', 'Token sesi perangkat tidak ditemukan. Silakan login kembali.');
-                return;
-            }
             showLoading('Mengecek Token...');
             google.script.run
-                .withFailureHandler(function(error) {
-                    hideLoading();
-                    showAlert('Koneksi Gagal', (error && error.message) ? error.message : 'Tidak dapat menghubungi server.');
-                })
                 .withSuccessHandler(function(res) {
                     hideLoading();
-                    if(res && res.status) {
-                        localStorage.setItem(kunciIzinUjianLokal(currUser.nisn), '1');
-                        simpanProfilSiswaLokal(currUser);
+                    if(res.status) {
                         document.getElementById('view-token').classList.add('hidden');
                         document.getElementById('view-token').classList.remove('flex');
                         mulaiSiswa();
@@ -2745,73 +2528,49 @@
         }
 
         function loadDataPeserta() {
-            const filterSelect = document.getElementById('filter-kelas-peserta');
-            const inputSelect = document.getElementById('input-peserta-kelas');
-            const kelasFilter = filterSelect ? filterSelect.value : "Semua Kelas";
-
+            const filterEl = document.getElementById('filter-kelas-peserta');
+            const kelasFilter = filterEl ? filterEl.value : 'Semua Kelas';
             showLoading("Memuat data peserta...");
-
             google.script.run
                 .withSuccessHandler(function(data) {
                     hideLoading();
-
-                    // Tampilkan pesan asli dari server jika proses backend gagal.
                     if (!data || data.status === false) {
-                        showAlert('Gagal Memuat Peserta',
-                            data && data.pesan ? data.pesan : 'Server tidak mengembalikan data peserta.');
+                        showAlert('Gagal Memuat Peserta', (data && data.pesan) || 'Server tidak mengirim data peserta yang valid.');
                         return;
                     }
-
-                    // Validasi struktur respons sebelum mengakses length/forEach.
-                    if (!Array.isArray(data.kelas) ||
-                        !Array.isArray(data.sesi) ||
-                        !Array.isArray(data.peserta)) {
-                        showAlert('Data Tidak Lengkap',
-                            'Respons server tidak memiliki struktur data peserta yang sesuai. Periksa fungsi getDataPesertaAdmin di Apps Script.');
+                    const kelas = Array.isArray(data.kelas) ? data.kelas : [];
+                    const sesi = Array.isArray(data.sesi) ? data.sesi : [];
+                    const peserta = Array.isArray(data.peserta) ? data.peserta : [];
+                    if (!Array.isArray(data.kelas) || !Array.isArray(data.sesi) || !Array.isArray(data.peserta)) {
+                        showAlert('Data Peserta Tidak Lengkap', 'Respons server tidak memiliki daftar kelas, sesi, atau peserta dalam format yang benar.');
                         return;
                     }
-
-                    const kelas = data.kelas;
-                    const sesi = data.sesi;
-                    const peserta = data.peserta;
-
-                    if (filterSelect && filterSelect.options.length <= 1 && kelas.length > 0) {
-                        filterSelect.innerHTML = '<option value="Semua Kelas">Semua Kelas</option>';
+                    if (filterEl && filterEl.options.length <= 1 && kelas.length > 0) {
+                        const inputSelect = document.getElementById('input-peserta-kelas');
+                        filterEl.innerHTML = '<option value="Semua Kelas">Semua Kelas</option>';
                         if (inputSelect) inputSelect.innerHTML = '';
-
-                        kelas.forEach(function(k) {
-                            filterSelect.innerHTML += `<option value="${k}">${k}</option>`;
+                        kelas.forEach(k => {
+                            filterEl.innerHTML += `<option value="${k}">${k}</option>`;
                             if (inputSelect) inputSelect.innerHTML += `<option value="${k}">${k}</option>`;
                         });
-
-                        filterSelect.value = kelasFilter;
-                        if (filterSelect.value !== kelasFilter) filterSelect.value = "Semua Kelas";
+                        filterEl.value = kelas.indexOf(kelasFilter) !== -1 || kelasFilter === 'Semua Kelas' ? kelasFilter : 'Semua Kelas';
                     }
-
                     if (sesi.length > 0) {
                         const inputSesi = document.getElementById('input-peserta-sesi');
                         if (inputSesi) {
                             inputSesi.innerHTML = '';
-                            sesi.forEach(function(s) {
-                                inputSesi.innerHTML += `<option value="${s}">${s}</option>`;
-                            });
+                            sesi.forEach(x => { inputSesi.innerHTML += `<option value="${x}">${x}</option>`; });
                         }
                     }
-
                     dataPesertaCetak = peserta;
                     const tbody = document.getElementById('tabel-peserta');
-                    if (!tbody) {
-                        showAlert('Elemen Tidak Ditemukan', 'Tabel peserta tidak ditemukan pada halaman.');
-                        return;
-                    }
+                    if (!tbody) return;
                     tbody.innerHTML = '';
-
                     if (peserta.length === 0) {
                         tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">Tidak ada data.</td></tr>`;
                         return;
                     }
-
-                    peserta.forEach(function(p) {
+                    peserta.forEach(p => {
                         tbody.innerHTML += `
                             <tr class="hover:bg-slate-50 transition-colors">
                                 <td class="p-4 font-mono font-medium text-slate-700">${p.nisn || ''}</td>
@@ -2820,22 +2579,18 @@
                                 <td class="p-4"><span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs font-bold">${p.sesi || ''}</span></td>
                                 <td class="p-4 text-slate-500 text-xs font-mono">${p.pass || ''}</td>
                                 <td class="p-4 whitespace-nowrap">
-                                    <button onclick="editPeserta(${p.row})" class="text-blue-600 hover:bg-blue-50 p-2 rounded mr-1">Edit</button>
-                                    <button onclick="konfirmasiHapusPeserta(${p.row}, '${p.nama}')" class="text-red-500 hover:bg-red-50 p-2 rounded">Hapus</button>
+                                    <button onclick="editPeserta(${Number(p.row)})" class="text-blue-600 hover:bg-blue-50 p-2 rounded mr-1">Edit</button>
+                                    <button onclick="konfirmasiHapusPeserta(${Number(p.row)}, '${String(p.nama || '').replace(/'/g, "\\'")}')" class="text-red-500 hover:bg-red-50 p-2 rounded">Hapus</button>
                                 </td>
-                            </tr>
-                        `;
+                            </tr>`;
                     });
                 })
-                .withFailureHandler(function(err) {
+                .withFailureHandler(function(error) {
                     hideLoading();
-                    showAlert('Koneksi Gagal',
-                        err && err.message ? err.message : 'Gagal mengambil data peserta dari server.');
+                    showAlert('Gagal Memuat Peserta', error && error.message ? error.message : 'Terjadi kesalahan saat mengambil data peserta.');
                 })
                 .getDataPesertaAdmin(kelasFilter);
         }
-
-        let pesertaEditRow = null;
 
         function tambahPeserta() {
             const data = {
@@ -2914,73 +2669,57 @@
 
         function loadDataGuru() {
             showLoading("Memuat data guru...");
-
             google.script.run
                 .withSuccessHandler(function(data) {
                     hideLoading();
-
-                    // Tampilkan pesan asli dari server jika proses backend gagal.
                     if (!data || data.status === false) {
-                        showAlert('Gagal Memuat Guru',
-                            data && data.pesan ? data.pesan : 'Server tidak mengembalikan data guru.');
+                        showAlert('Gagal Memuat Guru', (data && data.pesan) || 'Server tidak mengirim data guru yang valid.');
                         return;
                     }
-
-                    // Validasi struktur respons sebelum mengakses length/forEach.
                     if (!Array.isArray(data.mapel) || !Array.isArray(data.gurus)) {
-                        showAlert('Data Tidak Lengkap',
-                            'Respons server tidak memiliki data mapel atau guru yang sesuai. Periksa fungsi getDataGuruAdmin di Apps Script.');
+                        showAlert('Data Guru Tidak Lengkap', 'Respons server tidak memiliki daftar mata pelajaran atau guru dalam format yang benar.');
                         return;
                     }
-
                     const containerMapel = document.getElementById('input-guru-mapel-container');
-                    const tbody = document.getElementById('tabel-guru');
-                    if (!containerMapel || !tbody) {
-                        showAlert('Elemen Tidak Ditemukan', 'Bagian formulir atau tabel manajemen guru tidak ditemukan pada halaman.');
-                        return;
+                    if (containerMapel) {
+                        containerMapel.innerHTML = `
+                            <label class="flex items-center space-x-2 p-1.5 hover:bg-blue-50 rounded cursor-pointer border-b border-slate-200 transition-colors">
+                                <input type="checkbox" value="Semua Mapel" class="guru-mapel-checkbox w-4 h-4 text-blue-600 focus:ring-blue-500 rounded border-slate-300">
+                                <span class="text-xs font-bold text-slate-700">Semua Mapel (Full Akses)</span>
+                            </label>`;
+                        data.mapel.forEach(m => {
+                            containerMapel.innerHTML += `
+                                <label class="flex items-center space-x-2 p-1.5 hover:bg-slate-100 rounded cursor-pointer transition-colors">
+                                    <input type="checkbox" value="${m}" class="guru-mapel-checkbox w-4 h-4 text-blue-600 focus:ring-blue-500 rounded border-slate-300">
+                                    <span class="text-xs font-medium text-slate-600">${m}</span>
+                                </label>`;
+                        });
                     }
-
-                    containerMapel.innerHTML = `
-                        <label class="flex items-center space-x-2 p-1.5 hover:bg-blue-50 rounded cursor-pointer border-b border-slate-200 transition-colors">
-                            <input type="checkbox" value="Semua Mapel" class="guru-mapel-checkbox w-4 h-4 text-blue-600 focus:ring-blue-500 rounded border-slate-300">
-                            <span class="text-xs font-bold text-slate-700">Semua Mapel (Full Akses)</span>
-                        </label>
-                    `;
-
-                    data.mapel.forEach(function(m) {
-                        containerMapel.innerHTML += `
-                            <label class="flex items-center space-x-2 p-1.5 hover:bg-slate-100 rounded cursor-pointer transition-colors">
-                                <input type="checkbox" value="${m}" class="guru-mapel-checkbox w-4 h-4 text-blue-600 focus:ring-blue-500 rounded border-slate-300">
-                                <span class="text-xs font-medium text-slate-600">${m}</span>
-                            </label>
-                        `;
-                    });
-
+                    const tbody = document.getElementById('tabel-guru');
+                    if (!tbody) return;
                     tbody.innerHTML = '';
                     if (data.gurus.length === 0) {
                         tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-500">Tidak ada data guru.</td></tr>`;
                         return;
                     }
-
-                    data.gurus.forEach(function(g) {
+                    data.gurus.forEach(g => {
+                        const safe = v => String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                         tbody.innerHTML += `
                             <tr class="hover:bg-slate-50 transition-colors">
                                 <td class="p-4 font-mono font-medium text-slate-700">${g.username || ''}</td>
                                 <td class="p-4 font-medium text-slate-900">${g.nama || ''}</td>
-                                <td class="p-4"><span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold">${g.mapel || 'Semua Mapel'}</span></td>
+                                <td class="p-4"><span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold">${g.mapel || ''}</span></td>
                                 <td class="p-4 text-slate-500 text-xs font-mono">${g.pass || ''}</td>
                                 <td class="p-4 text-center whitespace-nowrap">
-                                    <button onclick="editGuru(${g.row}, '${g.username}', '${g.pass}', '${g.nama}', '${g.mapel}')" class="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold transition mr-1">Edit</button>
-                                    <button onclick="konfirmasiHapusGuru(${g.row}, '${g.nama}')" class="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Hapus</button>
+                                    <button onclick="editGuru(${Number(g.row)}, '${safe(g.username)}', '${safe(g.pass)}', '${safe(g.nama)}', '${safe(g.mapel)}')" class="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold transition mr-1">Edit</button>
+                                    <button onclick="konfirmasiHapusGuru(${Number(g.row)}, '${safe(g.nama)}')" class="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Hapus</button>
                                 </td>
-                            </tr>
-                        `;
+                            </tr>`;
                     });
                 })
-                .withFailureHandler(function(err) {
+                .withFailureHandler(function(error) {
                     hideLoading();
-                    showAlert('Koneksi Gagal',
-                        err && err.message ? err.message : 'Gagal mengambil data guru dari server.');
+                    showAlert('Gagal Memuat Guru', error && error.message ? error.message : 'Terjadi kesalahan saat mengambil data guru.');
                 })
                 .getDataGuruAdmin();
         }
@@ -3948,8 +3687,6 @@
                     if(response.status) {
                         localStorage.removeItem('cbt_state_' + currUser.nisn);
                         hapusSessionLokal(currUser.nisn);
-                        hapusProfilSiswaLokal();
-                        localStorage.removeItem(kunciIzinUjianLokal(currUser.nisn));
                         document.getElementById('view-siswa').innerHTML = `
                             <div class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
                                 <div class="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-sm">
@@ -3972,11 +3709,6 @@
                     } else showAlert('Error', 'Gagal menyimpan jawaban: ' + response.pesan);
                 }).simpanJawaban(payload);
         }
-        // Jalankan pemulihan setelah seluruh elemen halaman tersedia.
-        window.addEventListener('load', function() {
-            pulihkanSessionAdminOtomatis();
-            pulihkanSessionSiswaOtomatis();
-        });
     </script>
 </body>
 </html>
