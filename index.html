@@ -1300,8 +1300,8 @@
             </div>
             <nav class="p-4 space-y-2 flex-1 overflow-y-auto flex flex-col">
                 <div class="flex-1 space-y-2 overflow-y-auto">
-                <button onclick="switchTabGuru('import')" id="tab-guru-import" class="w-full text-left flex items-center py-2.5 px-3 rounded transition bg-indigo-600 text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">⇧</span><span>Upload Soal (Excel)</span></button>
-                <button onclick="bersihkanFormSoal(); switchTabGuru('buat')" id="tab-guru-buat" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-indigo-200 hover:bg-indigo-800 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">✎</span><span>Buat Soal Manual</span></button>
+                <button onclick="switchTabGuru('import')" id="tab-guru-import" class="w-full text-left flex items-center py-2.5 px-3 rounded transition bg-indigo-600 text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">⇧</span><span>Import ke Bank Soal (Excel)</span></button>
+                <button onclick="bersihkanFormSoal(); switchTabGuru('buat')" id="tab-guru-buat" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-indigo-200 hover:bg-indigo-800 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">✎</span><span>Buat Soal di Bank Soal</span></button>
                 <button onclick="switchTabGuru('ringkasan')" id="tab-guru-ringkasan" class="w-full text-left flex items-center py-2.5 px-3 rounded transition text-indigo-200 hover:bg-indigo-800 hover:text-white font-medium text-sm whitespace-nowrap"><span class="inline-flex w-6 justify-center mr-2 text-base opacity-90" aria-hidden="true">☷</span><span>Ringkasan Soal</span></button>
                 </div>
                 <div class="mt-3 pt-3 border-t border-indigo-800">
@@ -1380,8 +1380,8 @@
 
             <div id="panel-guru-buat" class="hidden max-w-4xl mx-auto space-y-6">
                 <div>
-                    <h1 class="text-2xl font-bold text-slate-800">Buat / Edit Soal Ujian CBT</h1>
-                    <p class="text-slate-500 mt-1">Soal akan otomatis tersimpan ke Database sesuai kelas dan siap diujikan.</p>
+                    <h1 class="text-2xl font-bold text-slate-800">Buat / Edit Bank Soal</h1>
+                    <p class="text-slate-500 mt-1">Soal disimpan di Bank Soal terlebih dahulu. Pilih Gunakan untuk Ujian jika ingin menyalinnya ke daftar soal ujian.</p>
                 </div>
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1475,8 +1475,8 @@
 
             <div id="panel-guru-ringkasan" class="hidden max-w-5xl mx-auto space-y-6">
                 <div>
-                    <h1 class="text-2xl font-bold text-slate-800">Ringkasan Soal</h1>
-                    <p class="text-slate-500 mt-1">Daftar soal yang telah Anda buat dan tersimpan di database.</p>
+                    <h1 class="text-2xl font-bold text-slate-800">Bank Soal Saya</h1>
+                    <p class="text-slate-500 mt-1">Daftar soal milik Anda. Soal di sini belum otomatis masuk ke ujian.</p>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row gap-4 items-end">
                     <div class="flex-1 w-full md:w-auto">
@@ -3250,21 +3250,25 @@
             const kelas = document.getElementById('guru-kelas-import').value;
             const tipe = document.getElementById('guru-tipe-import').value;
             
-            let finalData = dataUploadBulk.map(s => ({
-                ...s, mapel: mapel, kelas: kelas, tipe: tipe, pembuat: currUser.nama
-            }));
+            let finalData = dataUploadBulk.map(s => ({...s}));
 
-            showLoading('Mengupload ' + finalData.length + ' Soal ke Database...');
+            showLoading('Mengupload ' + finalData.length + ' Soal ke Bank Soal...');
             google.script.run
                 .withSuccessHandler(function(res) {
                     hideLoading();
-                    if(res.status) {
+                    if(res && res.status) {
                         showAlert('Sukses', res.pesan);
                         document.getElementById('excel-file').value = '';
                         dataUploadBulk = []; renderPreviewExcel();
                         switchTabGuru('ringkasan');
-                    } else showAlert('Gagal', res.pesan);
-                }).simpanSoalBulk(finalData);
+                        loadRingkasanSoal();
+                    } else showAlert('Gagal', res && res.pesan ? res.pesan : 'Import gagal.');
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    showAlert('Koneksi Gagal', err && err.message ? err.message : 'Import Bank Soal gagal.');
+                })
+                .simpanBankSoalBulk(finalData, mapel, kelas, tipe, currUser.nisn, currUser.sessionToken);
         }
 
         function loadDataFilterGuru() {
@@ -3409,21 +3413,32 @@
                 google.script.run
                     .withSuccessHandler(function(res) {
                         hideLoading();
-                        if(res.status) {
+                        if(res && res.status) {
                             showAlert('Sukses', res.pesan);
                             bersihkanFormSoal();
                             switchTabGuru('ringkasan');
-                        } else showAlert('Gagal', res.pesan);
-                    }).updateSoalGuru(editSoalRow, soalData);
+                            loadRingkasanSoal();
+                        } else showAlert('Gagal', res && res.pesan ? res.pesan : 'Pembaruan gagal.');
+                    })
+                    .withFailureHandler(function(err) {
+                        hideLoading();
+                        showAlert('Koneksi Gagal', err && err.message ? err.message : 'Pembaruan Bank Soal gagal.');
+                    }).updateBankSoalGuru(editSoalRow, soalData, currUser.nisn, currUser.sessionToken);
             } else {
                 google.script.run
                     .withSuccessHandler(function(res) {
                         hideLoading();
-                        if(res.status) {
+                        if(res && res.status) {
                             showAlert('Sukses', res.pesan);
                             bersihkanFormSoal();
-                        } else showAlert('Gagal', res.pesan);
-                    }).simpanSoalGuru(soalData);
+                            switchTabGuru('ringkasan');
+                            loadRingkasanSoal();
+                        } else showAlert('Gagal', res && res.pesan ? res.pesan : 'Penyimpanan gagal.');
+                    })
+                    .withFailureHandler(function(err) {
+                        hideLoading();
+                        showAlert('Koneksi Gagal', err && err.message ? err.message : 'Penyimpanan Bank Soal gagal.');
+                    }).simpanBankSoalGuru(soalData, currUser.nisn, currUser.sessionToken);
             }
         }
 
@@ -3431,37 +3446,73 @@
             const mapelFilter = document.getElementById('filter-mapel-ringkasan').value;
             const kelasFilter = document.getElementById('filter-kelas-ringkasan').value;
             const tbody = document.getElementById('tabel-ringkasan-soal');
-            tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-500">Sedang memuat data dari database...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-500">Memuat Bank Soal...</td></tr>';
 
-            google.script.run.withSuccessHandler(function(data) {
-                tbody.innerHTML = '';
-                if(data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-500">Belum ada soal untuk filter ini.</td></tr>';
-                    return;
-                }
-                data.forEach(s => {
-                    const cleanPertanyaan = s.pertanyaan.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-                    
-                    tbody.innerHTML += `
-                        <tr class="hover:bg-slate-50 transition-colors">
-                            <td class="p-4 font-medium text-slate-700">${s.mapel}</td>
-                            <td class="p-4"><span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold">${s.kelas}</span></td>
-                            <td class="p-4"><span class="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-1 rounded text-xs font-mono font-semibold">${s.tipe}</span></td>
-                            <td class="p-4 text-slate-600 text-sm whitespace-pre-wrap">${cleanPertanyaan}</td>
-                            <td class="p-4 text-center whitespace-nowrap">
-                                <button onclick="editSoal(${s.row})" class="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold transition mr-1">Edit</button>
-                                <button onclick="konfirmasiHapusSoal(${s.row})" class="text-red-500 hover:bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Hapus</button>
-                            </td>
-                        </tr>
-                    `;
-                });
-            }).getRingkasanSoalGuru(mapelFilter, kelasFilter, currUser.nama, currUser.role, currUser.mapelDiampu);
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    tbody.innerHTML = '';
+                    if (!res || !res.status) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-red-500">' +
+                            (res && res.pesan ? res.pesan : 'Bank Soal gagal dimuat.') + '</td></tr>';
+                        return;
+                    }
+                    const data = res.soal || [];
+                    if(data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-500">Belum ada soal di Bank Soal untuk filter ini.</td></tr>';
+                        return;
+                    }
+                    data.forEach(item => {
+                        const cleanPertanyaan = String(item.pertanyaan || '').replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                        const safeId = String(item.id || '').replace(/[^A-Za-z0-9-]/g, '');
+                        tbody.innerHTML += `
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4 font-medium text-slate-700">${item.mapel}</td>
+                                <td class="p-4"><span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold">${item.kelas}</span></td>
+                                <td class="p-4"><span class="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-1 rounded text-xs font-mono font-semibold">${item.tipe}</span></td>
+                                <td class="p-4 text-slate-600 text-sm whitespace-pre-wrap">${cleanPertanyaan}</td>
+                                <td class="p-4 text-center whitespace-nowrap">
+                                    <button onclick="editSoal('${safeId}')" class="text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg text-xs font-bold transition mr-1">Edit</button>
+                                    <button onclick="gunakanSoalBank('${safeId}')" class="text-emerald-700 hover:bg-emerald-50 px-2 py-1.5 rounded-lg text-xs font-bold transition mr-1">Gunakan untuk Ujian</button>
+                                    <button onclick="konfirmasiHapusSoal('${safeId}')" class="text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg text-xs font-bold transition">Hapus</button>
+                                </td>
+                            </tr>`;
+                    });
+                })
+                .withFailureHandler(function(err) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-red-500">' +
+                        (err && err.message ? err.message : 'Koneksi ke Bank Soal gagal.') + '</td></tr>';
+                })
+                .getBankSoalGuru(currUser.nisn, currUser.sessionToken, mapelFilter, kelasFilter);
+        }
+
+        function gunakanSoalBank(id) {
+            showAlert('Konfirmasi', 'Salin soal ini ke daftar soal ujian untuk mapel dan kelas terkait? Soal asli tetap tersimpan di Bank Soal.', true,
+                `eksekusiGunakanSoalBank('${String(id).replace(/[^A-Za-z0-9-]/g, '')}')`);
+        }
+
+        function eksekusiGunakanSoalBank(id) {
+            showLoading('Menyalin soal ke daftar ujian...');
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    hideLoading();
+                    if (res && res.status) showAlert('Berhasil', res.pesan);
+                    else showAlert('Gagal', res && res.pesan ? res.pesan : 'Soal tidak dapat disalin.');
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    showAlert('Koneksi Gagal', err && err.message ? err.message : 'Gagal menyalin soal.');
+                })
+                .gunakanBankSoalUntukUjian(id, currUser.nisn, currUser.sessionToken);
         }
 
         function editSoal(row) {
             showLoading("Mengambil data soal...");
             google.script.run.withSuccessHandler(function(data) {
                 hideLoading();
+                if (!data || !data.status) {
+                    showAlert('Gagal', data && data.pesan ? data.pesan : 'Detail Bank Soal tidak ditemukan.');
+                    return;
+                }
                 editSoalRow = row;
                 
                 document.getElementById('guru-mapel').value = data.mapel;
@@ -3511,7 +3562,7 @@
                 document.getElementById('btn-batal-edit').classList.remove('hidden');
                 
                 switchTabGuru('buat');
-            }).getDetailSoal(row);
+            }).getDetailBankSoalGuru(row, currUser.nisn, currUser.sessionToken);
         }
 
         function konfirmasiHapusSoal(row) {
@@ -3519,7 +3570,16 @@
         }
         function eksekusiHapusSoal(row) {
             showLoading("Menghapus soal...");
-            google.script.run.withSuccessHandler(function() { hideLoading(); loadRingkasanSoal(); }).hapusSoalGuru(row);
+            google.script.run
+                .withSuccessHandler(function(res) {
+                    hideLoading();
+                    if (res && res.status) loadRingkasanSoal();
+                    else showAlert('Gagal', res && res.pesan ? res.pesan : 'Soal tidak dapat dihapus.');
+                })
+                .withFailureHandler(function(err) {
+                    hideLoading();
+                    showAlert('Koneksi Gagal', err && err.message ? err.message : 'Gagal menghapus soal.');
+                }).hapusBankSoalGuru(row, currUser.nisn, currUser.sessionToken);
         }
 
         function mulaiSiswa() {
