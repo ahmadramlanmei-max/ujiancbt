@@ -705,6 +705,10 @@
                     <svg class="w-4 h-4 ml-2 transform transition group-hover/btn:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </button>
             </form>
+            <div id="session-restore-notice" class="hidden mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                <p id="session-restore-message">Sesi sebelumnya ditemukan.</p>
+                <button type="button" onclick="pulihkanSessionOtomatis(true)" class="mt-2 w-full rounded-lg bg-blue-600 px-3 py-2 font-semibold text-white hover:bg-blue-700">Pulihkan Sesi Tersimpan</button>
+            </div>
         </div>
     </div>
 
@@ -859,7 +863,7 @@
                     <div class="flex gap-2">
                         <button onclick="resetLoginTerpilih()" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg font-medium shadow-md transition flex items-center">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-7 0h10"></path></svg>
-                            Reset Login Terpilih
+                            Reset Sesi / Pindah Perangkat
                         </button>
                         <button onclick="loadStatusLoginAdmin()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium shadow-md transition flex items-center">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -869,7 +873,7 @@
                 </div>
 
                 <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-                    Centang siswa dengan status <b>Sudah Login</b> jika perlu login kembali karena terjadi kendala pada perangkat. Progres jawaban tetap tersimpan dan siswa dapat melanjutkan dari soal terakhir. Siswa yang sudah selesai tidak dapat direset.
+                    Untuk mengizinkan siswa pindah perangkat karena perangkat lama rusak/hilang, centang siswa berstatus <b>Login</b> atau <b>Mengerjakan</b>, lalu pilih <b>Reset Sesi / Pindah Perangkat</b>. Tindakan ini menggunakan fitur reset sesi yang sudah tersedia: token perangkat lama dicabut agar siswa dapat login di perangkat baru. Progres dan jawaban yang sudah tersimpan di server tidak dihapus. Siswa harus login kembali dengan NISN dan password yang sama. Siswa berstatus <b>Selesai</b> tidak dapat direset.
                 </div>
 
                 <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -1657,6 +1661,29 @@
             catch (e) { console.warn('Token sesi lokal tidak dapat dihapus.', e); }
         }
 
+        const KUNCI_USER_SESSION_TERAKHIR = 'cbt_last_session_user';
+        function simpanUserSessionTerakhir(username) {
+            try { if (username) localStorage.setItem(KUNCI_USER_SESSION_TERAKHIR, String(username).trim()); } catch (e) {}
+        }
+        function ambilUserSessionTerakhir() {
+            try {
+                let username = localStorage.getItem(KUNCI_USER_SESSION_TERAKHIR) || '';
+                if (username && ambilSessionLokal(username)) return username;
+                // Kompatibilitas untuk token lama yang sudah tersimpan sebelum fitur pemulihan ditambahkan.
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.indexOf('cbt_session_token_') === 0) {
+                        const candidate = key.substring('cbt_session_token_'.length);
+                        if (candidate && localStorage.getItem(key)) return candidate;
+                    }
+                }
+            } catch (e) {}
+            return '';
+        }
+        function hapusUserSessionTerakhir() {
+            try { localStorage.removeItem(KUNCI_USER_SESSION_TERAKHIR); } catch (e) {}
+        }
+
         function logoutAplikasi() {
             // Hentikan timer/interval yang masih aktif tanpa me-refresh halaman.
             if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
@@ -1669,7 +1696,13 @@
             if (userKeluar.role === 'admin' && userKeluar.sessionToken) {
                 google.script.run.akhiriSessionSiswa(userKeluar.nisn, userKeluar.sessionToken);
                 hapusSessionLokal(userKeluar.nisn);
+            } else if (userKeluar.role === 'guru' && userKeluar.sessionToken) {
+                google.script.run.akhiriSessionGuru(userKeluar.nisn, userKeluar.sessionToken);
+                hapusSessionLokal(userKeluar.nisn);
             }
+            // Keluar secara sengaja tidak otomatis masuk kembali setelah halaman dibuka.
+            // Token siswa tetap disimpan agar perangkat yang sama tidak kehilangan hak sesi.
+            hapusUserSessionTerakhir();
 
             isUjianAktif = false;
             isAway = false;
@@ -1859,6 +1892,81 @@
             }, 200);
         }
 
+        function tampilkanAplikasiSetelahLogin(response) {
+            currUser = response;
+            if (response.sessionToken) {
+                simpanSessionLokal(response.nisn, response.sessionToken);
+                simpanUserSessionTerakhir(response.nisn);
+            }
+            const notice = document.getElementById('session-restore-notice');
+            if (notice) notice.classList.add('hidden');
+            document.getElementById('view-login').classList.add('hidden');
+
+            if (response.role === 'admin') {
+                document.getElementById('view-admin').classList.remove('hidden');
+                document.getElementById('view-admin').classList.add('flex');
+                document.getElementById('admin-name').textContent = response.nama;
+                switchTabAdmin('dashboard');
+            } else if (response.role === 'guru') {
+                document.getElementById('view-guru').classList.remove('hidden');
+                document.getElementById('view-guru').classList.add('flex');
+                document.getElementById('guru-name').textContent = response.nama;
+                loadDataFilterGuru();
+            } else {
+                if (String(response.statusUjian || '').toLowerCase() === 'mengerjakan') {
+                    // Status Mengerjakan berarti token ujian sudah diterima sebelumnya.
+                    // Setelah refresh, siswa langsung kembali ke soal dan progres dipulihkan.
+                    mulaiSiswa();
+                } else {
+                    document.getElementById('view-token').classList.remove('hidden');
+                    document.getElementById('view-token').classList.add('flex');
+                }
+            }
+        }
+
+        function pulihkanSessionOtomatis(isRetry) {
+            const username = ambilUserSessionTerakhir();
+            const token = username ? ambilSessionLokal(username) : '';
+            const notice = document.getElementById('session-restore-notice');
+            const message = document.getElementById('session-restore-message');
+            if (!username || !token) {
+                if (notice) notice.classList.add('hidden');
+                return;
+            }
+            if (notice) notice.classList.remove('hidden');
+            if (message) message.textContent = isRetry ? 'Menghubungkan kembali ke server untuk memulihkan sesi...' : 'Sesi sebelumnya ditemukan. Mencoba memulihkan login secara otomatis...';
+            if (typeof google === 'undefined' || !google.script || !google.script.run) {
+                if (message) message.textContent = 'Koneksi ke server belum tersedia. Periksa jaringan, lalu tekan Pulihkan Sesi Tersimpan.';
+                return;
+            }
+            if (isRetry) showLoading('Memulihkan sesi tersimpan...');
+            google.script.run
+                .withSuccessHandler(function(response) {
+                    hideLoading();
+                    if (response && response.status) {
+                        tampilkanAplikasiSetelahLogin(response);
+                    } else {
+                        const pesan = response && response.pesan ? response.pesan : 'Sesi tidak dapat dipulihkan.';
+                        if (response && response.sessionInvalid) {
+                            hapusSessionLokal(username);
+                            hapusUserSessionTerakhir();
+                            if (notice) notice.classList.add('hidden');
+                            showAlert('Sesi Tidak Aktif', pesan);
+                        } else {
+                            if (message) message.textContent = pesan + ' Periksa jaringan lalu coba pulihkan kembali.';
+                            if (notice) notice.classList.remove('hidden');
+                        }
+                    }
+                })
+                .withFailureHandler(function(error) {
+                    hideLoading();
+                    if (message) message.textContent = 'Jaringan/server belum merespons. Token sesi tetap disimpan. Periksa koneksi lalu tekan Pulihkan Sesi Tersimpan.';
+                    if (notice) notice.classList.remove('hidden');
+                    console.warn('Pemulihan sesi tertunda:', error);
+                })
+                .pulihkanSessionLogin(username, token);
+        }
+
         function attemptLogin() {
             const user = document.getElementById('nisn').value.trim();
             const pass = document.getElementById('password').value.trim();
@@ -1870,27 +1978,16 @@
                 google.script.run
                     .withSuccessHandler(function(response) {
                         hideLoading();
-                        if (response.status) {
-                            currUser = response;
-                            if (response.sessionToken) simpanSessionLokal(response.nisn || user, response.sessionToken);
-                            document.getElementById('view-login').classList.add('hidden');
-                            
-                            if (response.role === 'admin') {
-                                document.getElementById('view-admin').classList.remove('hidden');
-                                document.getElementById('view-admin').classList.add('flex');
-                                document.getElementById('admin-name').textContent = response.nama;
-                                switchTabAdmin('dashboard'); 
-                            } else if (response.role === 'guru') {
-                                document.getElementById('view-guru').classList.remove('hidden');
-                                document.getElementById('view-guru').classList.add('flex');
-                                document.getElementById('guru-name').textContent = response.nama;
-                                loadDataFilterGuru();
-                            } else {
-                                document.getElementById('view-token').classList.remove('hidden');
-                                document.getElementById('view-token').classList.add('flex');
-                            }
-                        } else showAlert('Login Gagal', response.pesan);
-                    }).prosesLogin(user, pass, tokenPerangkat);
+                        if (response && response.status) {
+                            tampilkanAplikasiSetelahLogin(response);
+                        } else showAlert('Login Gagal', response && response.pesan ? response.pesan : 'Login gagal. Periksa data dan koneksi.');
+                    })
+                    .withFailureHandler(function(error) {
+                        hideLoading();
+                        showAlert('Gangguan Jaringan', 'Server belum merespons. Sesi yang tersimpan tidak dihapus. Periksa koneksi lalu coba lagi.');
+                        console.warn('Login gagal karena jaringan:', error);
+                    })
+                    .prosesLogin(user, pass, tokenPerangkat);
             } else {
                 hideLoading(); showAlert('Mode Offline', 'Jalankan dari Google Apps Script untuk akses Database.');
             }
@@ -1915,6 +2012,7 @@
         }
 
         function batalTokenSiswa() {
+            hapusUserSessionTerakhir();
             currUser = {};
             document.getElementById('view-token').classList.add('hidden');
             document.getElementById('view-token').classList.remove('flex');
@@ -2377,13 +2475,13 @@
             }
 
             showAlert('Konfirmasi Reset Login',
-                'Yakin ingin mereset login untuk ' + nisnList.length + ' siswa yang dipilih? Siswa tersebut dapat login kembali dari perangkatnya.',
+                'Reset sesi ' + nisnList.length + ' siswa terpilih? Token perangkat lama akan dicabut sehingga siswa dapat login di perangkat baru. Status ujian yang belum selesai dan jawaban yang sudah tersimpan tidak dihapus. Siswa berstatus Selesai tidak akan diubah.',
                 true,
                 'eksekusiResetLoginTerpilih(' + JSON.stringify(nisnList).replace(/'/g, "\\'") + ')');
         }
 
         function eksekusiResetLoginTerpilih(nisnList) {
-            showLoading("Mereset login siswa...");
+            showLoading("Mereset sesi siswa...");
             google.script.run.withSuccessHandler(function(res) {
                 hideLoading();
                 if(res && res.status) {
@@ -3687,6 +3785,7 @@
                     if(response.status) {
                         localStorage.removeItem('cbt_state_' + currUser.nisn);
                         hapusSessionLokal(currUser.nisn);
+                        hapusUserSessionTerakhir();
                         document.getElementById('view-siswa').innerHTML = `
                             <div class="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
                                 <div class="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-sm">
@@ -3709,6 +3808,10 @@
                     } else showAlert('Error', 'Gagal menyimpan jawaban: ' + response.pesan);
                 }).simpanJawaban(payload);
         }
+        // Pulihkan sesi otomatis setelah refresh/reload. Password tidak disimpan.
+        window.addEventListener('load', function() {
+            setTimeout(function() { pulihkanSessionOtomatis(false); }, 250);
+        });
     </script>
 </body>
 </html>
