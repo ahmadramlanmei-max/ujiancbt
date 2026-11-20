@@ -3944,6 +3944,176 @@
                     } else showAlert('Error', 'Gagal menyimpan jawaban: ' + response.pesan);
                 }).simpanJawaban(payload);
         }
+        /* ================= EDITOR RUMUS MATEMATIKA =================
+           Toolbar ini hanya membantu menyisipkan simbol/LaTeX ke kolom teks.
+           Tidak mengubah format data, proses simpan, penilaian, atau backend.
+        */
+        (function () {
+            let targetRumusAktif = null;
+            let posisiRumusAwal = 0;
+            let posisiRumusAkhir = 0;
+            const katalogRumus = {
+                'Pangkat & indeks': [
+                    ['Pangkat kuadrat', 'x^{2}'], ['Pangkat tiga', 'x^{3}'], ['Pangkat umum', 'x^{n}'],
+                    ['Indeks bawah', 'x_{1}'], ['Pangkat dan indeks', 'x_{i}^{2}']
+                ],
+                'Pecahan': [
+                    ['Pecahan sederhana', '\\frac{a}{b}'], ['Pecahan bertingkat', '\\dfrac{a+b}{c+d}'],
+                    ['Pecahan campuran', '1\\frac{1}{2}']
+                ],
+                'Akar': [
+                    ['Akar kuadrat', '\\sqrt{x}'], ['Akar dengan isi', '\\sqrt{x^{2}+y^{2}}'],
+                    ['Akar pangkat tiga', '\\sqrt[3]{x}'], ['Akar pangkat n', '\\sqrt[n]{x}']
+                ],
+                'Operasi & perbandingan': [
+                    ['Tambah / kurang', 'a+b'], ['Kali', 'a\\times b'], ['Bagi', 'a\\div b'],
+                    ['Tidak sama dengan', 'a\\ne b'], ['Kurang dari atau sama', 'a\\le b'],
+                    ['Lebih dari atau sama', 'a\\ge b'], ['Kurang lebih', '\\approx'], ['Plus-minus', '\\pm']
+                ],
+                'Aljabar & geometri': [
+                    ['Persamaan kuadrat', 'ax^{2}+bx+c=0'], ['Sudut', '\\angle ABC'],
+                    ['Derajat', '45^{\\circ}'], ['Pi', '\\pi'], ['Tak hingga', '\\infty'],
+                    ['Vektor', '\\vec{a}'], ['Nilai mutlak', '\\left|x\\right|']
+                ],
+                'Trigonometri': [
+                    ['Sinus', '\\sin x'], ['Cosinus', '\\cos x'], ['Tangen', '\\tan x'],
+                    ['Identitas', '\\sin^{2}x+\\cos^{2}x=1']
+                ],
+                'Limit, integral & sigma': [
+                    ['Limit', '\\lim_{x\\to 0} f(x)'], ['Integral', '\\int_{a}^{b} f(x)\\,dx'],
+                    ['Integral tak tentu', '\\int f(x)\\,dx'], ['Sigma', '\\sum_{i=1}^{n} i'],
+                    ['Turunan', '\\frac{dy}{dx}'], ['Produk', '\\prod_{i=1}^{n} a_i']
+                ],
+                'Matriks & himpunan': [
+                    ['Matriks 2×2', '\\begin{bmatrix}a&b\\\\c&d\\end{bmatrix}'],
+                    ['Himpunan', 'A\\cup B'], ['Irisan', 'A\\cap B'], ['Anggota himpunan', 'x\\in A'],
+                    ['Kosong', '\\varnothing']
+                ],
+                'Simbol langsung': [
+                    ['Pangkat ²', '²'], ['Pangkat ³', '³'], ['Pangkat ⁴', '⁴'],
+                    ['Indeks ₁', '₁'], ['Indeks ₂', '₂'], ['Akar √', '√'], ['Pi π', 'π'],
+                    ['Derajat °', '°'], ['Sudut ∠', '∠'], ['Tak hingga ∞', '∞'],
+                    ['Kurang lebih ≈', '≈'], ['Tidak sama ≠', '≠'], ['Lebih kecil ≤', '≤'],
+                    ['Lebih besar ≥', '≥'], ['Kali ×', '×'], ['Bagi ÷', '÷'], ['Sigma Σ', 'Σ'],
+                    ['Integral ∫', '∫'], ['Alpha α', 'α'], ['Beta β', 'β'], ['Theta θ', 'θ']
+                ]
+            };
+
+            function simpanPosisi(target) {
+                if (!target) return;
+                targetRumusAktif = target;
+                posisiRumusAwal = typeof target.selectionStart === 'number' ? target.selectionStart : target.value.length;
+                posisiRumusAkhir = typeof target.selectionEnd === 'number' ? target.selectionEnd : target.value.length;
+            }
+
+            function buatModal() {
+                if (document.getElementById('cbt-editor-rumus')) return;
+                const modal = document.createElement('div');
+                modal.id = 'cbt-editor-rumus';
+                modal.className = 'hidden fixed inset-0 z-[12000] bg-slate-900/60 p-3 sm:p-6 flex items-center justify-center';
+                modal.innerHTML = `
+                    <div class="bg-white w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col">
+                        <div class="p-4 border-b flex items-center justify-between gap-3">
+                            <div><h3 class="font-bold text-lg text-slate-800">Sisipkan Rumus & Simbol</h3><p class="text-xs text-slate-500">Pilih rumus untuk memasukkannya ke kolom yang sedang diedit.</p></div>
+                            <button type="button" id="cbt-tutup-editor-rumus" class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Tutup ✕</button>
+                        </div>
+                        <div class="p-4 overflow-y-auto space-y-4">
+                            <div id="cbt-kategori-rumus" class="flex flex-wrap gap-2"></div>
+                            <div id="cbt-daftar-rumus" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
+                            <div class="border-t pt-3">
+                                <label for="cbt-rumus-kustom" class="block text-sm font-semibold text-slate-700 mb-1">Atau tulis/tempel rumus LaTeX sendiri</label>
+                                <textarea id="cbt-rumus-kustom" rows="2" class="w-full border rounded-lg p-2 text-sm" placeholder="Contoh: \\frac{a+b}{c} atau \\sqrt{x^2+4}"></textarea>
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    <button type="button" id="cbt-sisipkan-inline" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold">Sisipkan dalam kalimat</button>
+                                    <button type="button" id="cbt-sisipkan-blok" class="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm font-semibold">Sisipkan sebagai rumus besar</button>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-2">Rumus dalam kalimat memakai \( ... \), sedangkan rumus besar memakai \[ ... \].</p>
+                            </div>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+                document.getElementById('cbt-tutup-editor-rumus').addEventListener('click', tutupModal);
+                modal.addEventListener('click', e => { if (e.target === modal) tutupModal(); });
+                document.getElementById('cbt-sisipkan-inline').addEventListener('click', () => sisipkanRumus('\\(', '\\)'));
+                document.getElementById('cbt-sisipkan-blok').addEventListener('click', () => sisipkanRumus('\\[', '\\]'));
+                tampilKategori(Object.keys(katalogRumus)[0]);
+            }
+
+            function tampilKategori(nama) {
+                const kategori = document.getElementById('cbt-kategori-rumus');
+                const daftar = document.getElementById('cbt-daftar-rumus');
+                kategori.innerHTML = '';
+                Object.keys(katalogRumus).forEach(k => {
+                    const b = document.createElement('button');
+                    b.type = 'button'; b.textContent = k;
+                    b.className = 'px-3 py-2 rounded-lg text-xs font-semibold ' + (k === nama ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700');
+                    b.addEventListener('click', () => tampilKategori(k));
+                    kategori.appendChild(b);
+                });
+                daftar.innerHTML = '';
+                katalogRumus[nama].forEach(item => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'text-left p-3 border rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition';
+                    const label = document.createElement('div'); label.className = 'text-xs text-slate-500 mb-1'; label.textContent = item[0];
+                    const value = document.createElement('div'); value.className = 'font-semibold text-slate-800 break-words'; value.textContent = item[1];
+                    b.append(label, value);
+                    b.addEventListener('click', () => sisipkanRumus('\\(', '\\)', item[1]));
+                    daftar.appendChild(b);
+                });
+            }
+
+            function bukaModal(target) {
+                if (target) simpanPosisi(target);
+                buatModal();
+                document.getElementById('cbt-rumus-kustom').value = '';
+                document.getElementById('cbt-editor-rumus').classList.remove('hidden');
+            }
+            function tutupModal() {
+                const modal = document.getElementById('cbt-editor-rumus');
+                if (modal) modal.classList.add('hidden');
+                if (targetRumusAktif) targetRumusAktif.focus();
+            }
+            function sisipkanRumus(pembuka, penutup, isi) {
+                if (!targetRumusAktif) { alert('Pilih kolom pertanyaan atau opsi jawaban terlebih dahulu.'); return; }
+                const konten = isi !== undefined ? isi : document.getElementById('cbt-rumus-kustom').value.trim();
+                if (!konten) { alert('Silakan pilih atau tulis rumus terlebih dahulu.'); return; }
+                const nilai = targetRumusAktif.value || '';
+                const sisipan = pembuka + konten + penutup;
+                targetRumusAktif.value = nilai.slice(0, posisiRumusAwal) + sisipan + nilai.slice(posisiRumusAkhir);
+                const posisiBaru = posisiRumusAwal + sisipan.length;
+                targetRumusAktif.focus();
+                if (typeof targetRumusAktif.setSelectionRange === 'function') targetRumusAktif.setSelectionRange(posisiBaru, posisiBaru);
+                posisiRumusAwal = posisiBaru; posisiRumusAkhir = posisiBaru;
+                tutupModal();
+                targetRumusAktif.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+
+            function pasangToolbar() {
+                const ids = [
+                    'guru-pertanyaan', 'guru-opsi-a', 'guru-opsi-b', 'guru-opsi-c', 'guru-opsi-d',
+                    'mjd-p-a', 'mjd-j-a', 'mjd-p-b', 'mjd-j-b', 'mjd-p-c', 'mjd-j-c', 'mjd-p-d', 'mjd-j-d',
+                    'guru-kunci-is'
+                ];
+                ids.forEach(id => {
+                    const field = document.getElementById(id);
+                    if (!field || field.dataset.rumusToolbar === '1') return;
+                    field.dataset.rumusToolbar = '1';
+                    ['focus', 'click', 'keyup', 'select', 'mouseup'].forEach(evt => field.addEventListener(evt, () => simpanPosisi(field)));
+                    field.addEventListener('blur', () => simpanPosisi(field));
+                    const tombol = document.createElement('button');
+                    tombol.type = 'button';
+                    tombol.textContent = '∑ Sisipkan Rumus / Simbol';
+                    tombol.className = 'mt-1 mb-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100';
+                    tombol.addEventListener('mousedown', e => { e.preventDefault(); simpanPosisi(field); });
+                    tombol.addEventListener('click', () => bukaModal(field));
+                    field.insertAdjacentElement('afterend', tombol);
+                });
+            }
+            window.addEventListener('load', pasangToolbar);
+            window.bukaEditorRumusCBT = bukaModal;
+        })();
+
         // Jalankan pemulihan setelah seluruh elemen halaman tersedia.
         window.addEventListener('load', function() {
             pulihkanSessionAdminOtomatis();
