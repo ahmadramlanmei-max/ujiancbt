@@ -39,6 +39,20 @@
     <title>Portal Ujian CBT</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- MathJax: render rumus matematika LaTeX pada soal dan pilihan jawaban. -->
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['\\(', '\\)']],
+          displayMath: [['\\[', '\\]']],
+          processEscapes: true,
+          packages: {'[+]': ['ams']}
+        },
+        options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] },
+        startup: { typeset: false }
+      };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
@@ -1311,7 +1325,7 @@
             <div id="panel-guru-import" class="max-w-5xl mx-auto space-y-6">
                 <div>
                     <h1 class="text-2xl font-bold text-slate-800">Upload Soal via Excel</h1>
-                    <p class="text-slate-500 mt-1">Impor puluhan soal sekaligus dari format Excel (.xlsx) untuk mempercepat proses pembuatan ujian.</p>
+                    <p class="text-slate-500 mt-1">Impor puluhan soal sekaligus dari format Excel (.xlsx) untuk mempercepat proses pembuatan ujian. Kolom pertanyaan dan opsi jawaban mendukung rumus LaTeX, misalnya \(x^2\) atau \[\frac{a}{b}\].</p>
                 </div>
                 
                 <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -1410,6 +1424,7 @@
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Teks Pertanyaan</label>
                         <textarea id="guru-pertanyaan" rows="4" class="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500 whitespace-pre-wrap" placeholder="Tuliskan pertanyaan di sini..."></textarea>
+                        <p class="text-xs text-indigo-600 mt-2">Rumus LaTeX: gunakan <code>\( ... \)</code> untuk rumus di dalam kalimat atau <code>\[ ... \]</code> untuk rumus di baris tersendiri. Contoh: <code>\[x^2+3x-10=0\]</code>.</p>
                     </div>
 
                     <div id="form-opsi-pg" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1418,6 +1433,7 @@
                         <div><label class="block text-xs font-medium text-slate-500">Opsi C</label><input type="text" id="guru-opsi-c" class="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"></div>
                         <div><label class="block text-xs font-medium text-slate-500">Opsi D</label><input type="text" id="guru-opsi-d" class="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"></div>
                     </div>
+                    <p class="text-xs text-indigo-600 -mt-2">Rumus pada opsi jawaban juga dapat ditulis dengan format LaTeX, misalnya <code>\(\frac{1}{2}\)</code> atau <code>\(\sqrt{25}\)</code>.</p>
 
                     <div id="form-opsi-mjd" class="hidden space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                         <label class="block text-sm font-bold text-slate-700 mb-2">Pasangan Menjodohkan (Maksimal 4 Baris)</label>
@@ -3674,6 +3690,32 @@
             }, 1000);
         }
 
+        // Render ulang rumus pada elemen yang baru diisi secara dinamis.
+        // Jika MathJax belum selesai dimuat, typesetting dicoba kembali setelah tersedia.
+        function typesetRumusCBT(elements) {
+            const targets = (Array.isArray(elements) ? elements : [elements]).filter(Boolean);
+            if (!targets.length) return;
+            if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+                window.MathJax.typesetClear(targets);
+                window.MathJax.typesetPromise(targets).catch(function(err) {
+                    console.warn('MathJax gagal merender rumus:', err);
+                });
+            } else {
+                let percobaan = 0;
+                const tungguMathJax = setInterval(function() {
+                    percobaan++;
+                    if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+                        clearInterval(tungguMathJax);
+                        window.MathJax.typesetPromise(targets).catch(function(err) {
+                            console.warn('MathJax gagal merender rumus:', err);
+                        });
+                    } else if (percobaan >= 20) {
+                        clearInterval(tungguMathJax);
+                    }
+                }, 250);
+            }
+        }
+
         function renderSoal(index) {
             indexSaatIni = index;
             const soal = dataSoal[indexSaatIni];
@@ -3769,6 +3811,9 @@
                 html += '</div>';
                 elOpsi.innerHTML = html;
             }
+
+            // Rumus pada pertanyaan dan seluruh opsi (termasuk PGK/menjodohkan) dirender.
+            typesetRumusCBT([elTeks, elOpsi]);
             
             document.getElementById('ragu-checkbox').checked = !!raguRagu[soal.id];
             document.querySelectorAll('#grid-soal button').forEach((btn, i) => {
